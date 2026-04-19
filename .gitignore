@@ -1,0 +1,17 @@
+# 1. Dependensi (Bisa diinstal ulang via npm install)
+node_modules/
+
+# 2. Environment Variables (Rahasia, jangan sampai bocor ke publik!)
+.env
+
+# 3. Folder Upload (Data foto lokal tidak perlu masuk ke repository)
+uploads/
+
+# 4. Log Files (Catatan error lokal)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 5. OS Generated Files (File sampah dari sistem operasi)
+.DS_Store
+Thumbs.db
