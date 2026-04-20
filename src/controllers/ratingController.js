@@ -9,19 +9,21 @@ export const giveRating = async (req, res) => {
     }
 
     try {
-        // 1. Validasi Status Bantuan (Harus Completed)
-        const checkQuery = `SELECT status FROM donation_points WHERE id = $1`;
-        const checkResult = await pool.query(checkQuery, [point_id]);
+        // Ambil data pembuat titik bantuan
+        const pointQuery = `SELECT created_by FROM donation_points WHERE id = $1`;
+        const pointResult = await pool.query(pointQuery, [point_id]);
 
-        if (checkResult.rowCount === 0) {
+        if (pointResult.rowCount === 0) {
             return res.status(404).json({ error: "Titik bantuan tidak ditemukan" });
         }
 
-        if (checkResult.rows[0].status !== 'Completed') {
-            return res.status(400).json({ error: "Rating hanya dapat diberikan pada titik bantuan yang sudah berstatus 'Completed'" });
+        // CEK: Jika yang memberi rating adalah pemilik titik, TOLAK.
+        if (pointResult.rows[0].created_by === userId) {
+            return res.status(403).json({ error: "Anda tidak dapat memberikan rating pada bantuan yang Anda buat sendiri." });
         }
 
-        // 2. Simpan Rating
+
+        // Simpan Rating
         const insertQuery = `
             INSERT INTO ratings (point_id, given_by, score, review)
             VALUES ($1, $2, $3, $4)

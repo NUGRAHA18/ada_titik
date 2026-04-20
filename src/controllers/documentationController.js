@@ -2,7 +2,6 @@ import pool from '../config/db.js';
 
 export const uploadDocumentation = async (req, res) => {
     const { point_id, caption } = req.body;
-    // req.file didapat dari middleware multer
     const photo_url = req.file ? `/uploads/${req.file.filename}` : null; 
 
     if (!point_id || !photo_url) {

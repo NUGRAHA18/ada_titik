@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import pool from "../config/db.js"; // Wajib tambahkan .js
+import pool from "../config/db.js"; 
 import jwt from "jsonwebtoken";
 
 export const register = async (req, res) => {
@@ -49,7 +49,7 @@ export const login = async (req, res) => {
   }
 
   try {
-    // 1. Cari user berdasarkan email
+    //Cari user berdasarkan email
     const query = `SELECT id, name, password_hash, role FROM users WHERE email = $1`;
     const { rows } = await pool.query(query, [email]);
 
@@ -59,17 +59,17 @@ export const login = async (req, res) => {
 
     const user = rows[0];
 
-    // 2. Verifikasi kecocokan password
+    // Verifikasi kecocokan password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ error: "Email atau password salah" });
     }
 
-    // 3. Cetak Token JWT
+    // Cetak Token JWT
     const token = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "24h" }, // Token berlaku 1 hari
+      { expiresIn: "24h" }, 
     );
 
     res.status(200).json({

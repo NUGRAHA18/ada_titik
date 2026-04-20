@@ -2,7 +2,6 @@ import pool from "../config/db.js";
 
 // Fungsi Tambah Titik Bantuan
 export const createDonationPoint = async (req, res) => {
-  // userId didapat dari token JWT (satpam kita)
   const { userId } = req.user;
   const { title, description, longitude, latitude, urgency } = req.body;
 
@@ -64,7 +63,6 @@ export const getDonationPoints = async (req, res) => {
 };
 
 export const getNearbyDonations = async (req, res) => {
-    // Ambil parameter dari URL (misal: ?lat=-7.7956&lng=110.3785&radius=5000)
     const { lat, lng, radius } = req.query;
 
     if (!lat || !lng || !radius) {
@@ -72,7 +70,7 @@ export const getNearbyDonations = async (req, res) => {
     }
 
     try {
-        // PostGIS Query: Cari titik dalam radius X meter, urutkan dari yang paling dekat
+        // Cari titik dalam radius X meter, urutkan dari yang paling dekat
         const query = `
             SELECT id, title, description, status, urgency, 
                    ST_X(location::geometry) AS longitude, 
@@ -84,7 +82,7 @@ export const getNearbyDonations = async (req, res) => {
             ORDER BY distance_meters ASC
         `;
         
-        const values = [lng, lat, radius]; // Ingat: PostGIS urutannya Longitude (X), lalu Latitude (Y)
+        const values = [lng, lat, radius]; 
 
         const result = await pool.query(query, values);
 
@@ -106,7 +104,7 @@ export const updateDonationStatus = async (req, res) => {
     const { status, user_lat, user_lng } = req.body; // Minta koordinat device user
     const { userId } = req.user;
 
-    // 1. Validasi Input Dasar
+    // Validasi Input Dasar
     if (!status || !['Open', 'On Progress', 'Completed'].includes(status)) {
         return res.status(400).json({ error: "Status tidak valid" });
     }
@@ -115,7 +113,7 @@ export const updateDonationStatus = async (req, res) => {
     }
 
     try {
-        // 2. Ambil data titik dan hitung jaraknya dengan lokasi user (dalam meter)
+        // Ambil data titik dan hitung jaraknya dengan lokasi user (dalam meter)
         const checkQuery = `
             SELECT created_by,
                    ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance_meters
@@ -131,19 +129,19 @@ export const updateDonationStatus = async (req, res) => {
 
         const { created_by, distance_meters } = checkResult.rows[0];
 
-        // 3. Verifikasi Kepemilikan
+        // Verifikasi Kepemilikan
         if (created_by !== userId) {
             return res.status(403).json({ error: "Akses ditolak. Hanya pembuat yang dapat mengubah status" });
         }
 
-        // 4. Verifikasi Geo-Fencing (Radius Maksimal 100 Meter)
+        // Verifikasi Geo-Fencing (Radius Maksimal 100 Meter)
         if (distance_meters > 100) {
             return res.status(403).json({ 
                 error: `Geo-Fencing gagal. Anda berada ${Math.round(distance_meters)} meter dari lokasi. Jarak maksimal adalah 100 meter.` 
             });
         }
 
-        // 5. Update Status
+        // Update Status
         const updateQuery = `
             UPDATE donation_points 
             SET status = $1 

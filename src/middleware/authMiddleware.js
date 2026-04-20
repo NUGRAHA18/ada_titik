@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 export const verifyToken = (req, res, next) => {
   // Ambil token dari header request
   const authHeader = req.header("Authorization");
+  console.log(authHeader);
 
   if (!authHeader) {
     return res
