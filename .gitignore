@@ -3,6 +3,8 @@ node_modules/
 
 # 2. Environment Variables (Rahasia, jangan sampai bocor ke publik!)
 .env
+.env.*
+!.env.example
 
 # 3. Folder Upload (Data foto lokal tidak perlu masuk ke repository)
 uploads/

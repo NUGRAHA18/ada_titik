@@ -1,56 +1,71 @@
+// URUTAN IMPORT PENTING: env.js harus pertama agar db.js dapat process.env
+import "./config/env.js";
+import "./config/db.js";
 import express from "express";
 import cors from "cors";
-import "./config/db.js";
 import fs from "fs";
-import "dotenv/config";
+import morgan from "morgan";
+import rateLimit from 'express-rate-limit';
 import { verifyToken } from "./middleware/authMiddleware.js";
 import authRoutes from "./routes/authRoutes.js";
 import donationRoutes from "./routes/donationRoutes.js";
 import documentationRoutes from './routes/documentationRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
-import rateLimit from 'express-rate-limit';
 import analyticsRoutes from './routes/analyticsRoutes.js';
-import { getNearbyNotifications } from './controllers/donationController.js';
 import adminRoutes from './routes/adminRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import { getNearbyNotifications } from './controllers/donationController.js';
 
 const PORT = process.env.PORT || 3000;
-const app = express();
+const app  = express();
+
+// CORS: whitelist per environment, fallback '*' untuk development
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : null;
 
 const corsOptions = {
-    origin: '*', 
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], 
-    allowedHeaders: ['Content-Type', 'Authorization'] 
+    origin: (process.env.NODE_ENV === 'production' && allowedOrigins)
+        ? (origin, cb) => {
+            if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+            cb(new Error(`Origin '${origin}' tidak diizinkan oleh CORS`));
+          }
+        : '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
+// Pastikan folder uploads tersedia
 const uploadDir = './uploads';
-if (!fs.existsSync(uploadDir)){
+if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
     console.log('📁 Folder uploads berhasil dibuat otomatis');
 }
 
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
+    windowMs: 15 * 60 * 1000,
     max: 100,
-    message: { error: "Terlalu banyak permintaan dari IP ini, silakan coba lagi setelah 15 menit." }
+    message: { error: "Terlalu banyak permintaan dari IP ini, silakan coba lagi setelah 15 menit." },
 });
 
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(limiter);
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-app.use("/api/auth", authRoutes);
-app.use("/api/donations", donationRoutes);
-app.use('/api/documentation', documentationRoutes); 
-app.use('/api/ratings', ratingRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/uploads', express.static('uploads'));
+app.use("/api/auth",          authRoutes);
+app.use("/api/donations",     donationRoutes);
+app.use('/api/documentation', documentationRoutes);
+app.use('/api/ratings',       ratingRoutes);
+app.use('/api/analytics',     analyticsRoutes);
+app.use('/api/reports',       reportRoutes);
+app.use('/api/admin',         adminRoutes);
+app.use('/api/users',         userRoutes);
+app.use('/uploads',           express.static('uploads'));
 app.get('/api/notifications/nearby', verifyToken, getNearbyNotifications);
-app.use('/api/reports', reportRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/users', userRoutes);
 
 app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
+    const env = process.env.NODE_ENV || 'development';
+    console.log(`Server berjalan di http://localhost:${PORT} [${env}]`);
 });
