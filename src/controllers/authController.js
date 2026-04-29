@@ -42,43 +42,49 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email dan password wajib diisi" });
-  }
+    try {
+        // 1. Ambil data user, PASTIKAN MENGAMBIL KOLOM 'role'
+        const query = `SELECT id, name, email, password_hash, role FROM users WHERE email = $1`;
+        const result = await pool.query(query, [email]);
 
-  try {
-    //Cari user berdasarkan email
-    const query = `SELECT id, name, password_hash, role FROM users WHERE email = $1`;
-    const { rows } = await pool.query(query, [email]);
+        if (result.rowCount === 0) {
+            return res.status(401).json({ error: "Email atau password salah" });
+        }
 
-    if (rows.length === 0) {
-      return res.status(401).json({ error: "Email atau password salah" });
+        const user = result.rows[0];
+
+        // 2. Verifikasi Password
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+        if (!isMatch) {
+            return res.status(401).json({ error: "Email atau password salah" });
+        }
+
+        // 3. Buat Token JWT dengan menyematkan 'role' di dalamnya
+        const token = jwt.sign(
+            { 
+                userId: user.id, 
+                role: user.role // <-- Tambahan penting untuk middleware checkRole
+            }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '1d' }
+        );
+
+        // 4. Kirim response yang memudahkan Arbat (Frontend)
+        res.status(200).json({
+            message: "Login berhasil",
+            token: token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role // Frontend akan pakai ini untuk logic "if role == admin -> buka Halaman Admin"
+            }
+        });
+
+    } catch (error) {
+        console.error("Error saat login:", error);
+        res.status(500).json({ error: "Terjadi kesalahan pada server" });
     }
-
-    const user = rows[0];
-
-    // Verifikasi kecocokan password
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      return res.status(401).json({ error: "Email atau password salah" });
-    }
-
-    // Cetak Token JWT
-    const token = jwt.sign(
-      { userId: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }, 
-    );
-
-    res.status(200).json({
-      message: "Login berhasil",
-      token,
-      user: { id: user.id, name: user.name, role: user.role },
-    });
-  } catch (error) {
-    console.error("Error Login:", error);
-    res.status(500).json({ error: "Terjadi kesalahan pada server" });
-  }
 };

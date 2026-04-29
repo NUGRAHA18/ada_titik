@@ -1,11 +1,15 @@
 import express from 'express';
-import { uploadDocumentation } from '../controllers/documentationController.js';
+import { getDocumentationByPoint, uploadDocumentation } from '../controllers/documentationController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
+import { checkRole } from '../middleware/roleMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
-// Route dengan 2 middleware: Cek Token (Login) -> Proses Upload Foto (maks 1 file) -> Controller
-router.post('/', verifyToken, upload.single('photo'), uploadDocumentation);
+// Siapapun yang login bisa melihat dokumentasi (transparansi donatur)
+router.get('/:point_id', verifyToken, getDocumentationByPoint);
+
+// Hanya komunitas yang bisa upload dokumentasi bukti distribusi
+router.post('/', verifyToken, checkRole(['komunitas']), upload.single('photo'), uploadDocumentation);
 
 export default router;

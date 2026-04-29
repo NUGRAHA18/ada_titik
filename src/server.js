@@ -3,15 +3,26 @@ import cors from "cors";
 import "./config/db.js";
 import fs from "fs";
 import "dotenv/config";
+import { verifyToken } from "./middleware/authMiddleware.js";
 import authRoutes from "./routes/authRoutes.js";
 import donationRoutes from "./routes/donationRoutes.js";
 import documentationRoutes from './routes/documentationRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import rateLimit from 'express-rate-limit';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import { getNearbyNotifications } from './controllers/donationController.js';
+import adminRoutes from './routes/adminRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 const PORT = process.env.PORT || 3000;
 const app = express();
+
+const corsOptions = {
+    origin: '*', 
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], 
+    allowedHeaders: ['Content-Type', 'Authorization'] 
+};
 
 const uploadDir = './uploads';
 if (!fs.existsSync(uploadDir)){
@@ -25,8 +36,9 @@ const limiter = rateLimit({
     message: { error: "Terlalu banyak permintaan dari IP ini, silakan coba lagi setelah 15 menit." }
 });
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(limiter);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/donations", donationRoutes);
@@ -34,6 +46,10 @@ app.use('/api/documentation', documentationRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/uploads', express.static('uploads'));
+app.get('/api/notifications/nearby', verifyToken, getNearbyNotifications);
+app.use('/api/reports', reportRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/users', userRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server berjalan di http://localhost:${PORT}`);

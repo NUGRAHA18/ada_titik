@@ -1,49 +1,290 @@
-# Titik Baik - Backend API 📍🤝
+# 📍 ada titik?
 
-Titik Baik adalah backend sistem berbasis LBS (*Location-Based Service*) yang menjembatani donatur dan penerima bantuan sosial. Sistem ini dirancang untuk menyelesaikan masalah *Information Asymmetry* dengan memvisualisasikan data suplai dan permintaan bantuan pada peta interaktif.
+**Bantuan tepat, sampai ke yang membutuhkan**
 
-## 🚀 Teknologi Utama
-* **Runtime:** Node.js
-* **Framework:** Express.js (ES6 Modules)
-* **Database:** PostgreSQL dengan ekstensi **PostGIS** untuk kalkulasi geospasial.
-* **Keamanan:** JSON Web Token (JWT) & bcrypt.
-* **Storage:** Multer (Local File System untuk unggah foto).
+---
 
-## ✨ Fitur Utama
-1. **User Management:** Autentikasi JWT dengan pemisahan peran (Donatur & Komunitas).
-2. **Core Mapping:** Pembuatan titik kebutuhan bantuan dengan koordinat Latitude & Longitude (PostGIS Point).
-3. **Radius Search:** Pencarian titik bantuan terdekat (Nearby) menggunakan `ST_DWithin`.
-4. **Geo-Fencing Validation:** Validasi pembaruan status (`Completed`) hanya bisa dilakukan jika *user* berada dalam radius maksimal 100 meter dari titik bantuan.
-5. **Dokumentasi Transparan:** Sistem unggah foto bukti setelah bantuan disalurkan.
-6. **Reputation System:** Pemberian rating (1-5) dan ulasan untuk menjaga kepercayaan (Trust) antar pengguna.
+## 📌 Deskripsi Singkat
 
-## 🛠️ Prasyarat Instalasi
-Sebelum menjalankan proyek ini, pastikan Anda telah menginstal:
-* [Node.js](https://nodejs.org/) (v18 atau lebih baru)
-* [PostgreSQL](https://www.postgresql.org/)
-* **PostGIS Extension** diaktifkan pada database Anda.
+**ada titik?** adalah aplikasi *social donation mapping* berbasis lokasi yang bertujuan untuk menjembatani **donatur** dan **komunitas penyalur bantuan** secara transparan, akurat, dan efisien.
 
-## 📦 Cara Menjalankan Secara Lokal
+Berbeda dengan platform donasi konvensional, aplikasi ini tidak hanya menghubungkan pemberi dan penerima bantuan, tetapi menghadirkan **sistem berbasis peta (map-based system)** yang memungkinkan distribusi bantuan dilakukan secara **tepat sasaran**.
 
-**1. Clone repositori ini**
-```bash
-git clone [https://github.com/NUGRAHA18/titik_baik_backend.git](https://github.com/NUGRAHA18/titik_baik_backend.git)
-cd titik_baik_backend
+---
+
+## 🎯 Latar Belakang (Studi Kasus)
+
+Dalam praktik di masyarakat, terdapat beberapa permasalahan utama:
+
+* ❗ **Information Asymmetry**
+  Donatur tidak mengetahui lokasi kebutuhan bantuan terdekat
+
+* ❗ **Logistics Mismatch**
+  Bantuan sering menumpuk di lembaga besar, sementara wilayah kecil terabaikan
+
+* ❗ **Kurangnya Validitas Informasi**
+  Banyak permintaan bantuan tidak jelas atau fiktif
+
+* ❗ **Minim Transparansi**
+  Donatur tidak mengetahui apakah bantuan benar-benar sampai
+
+---
+
+## 💡 Solusi yang Ditawarkan
+
+Aplikasi **ada titik?** menghadirkan solusi melalui:
+
+* 📍 Visualisasi kebutuhan bantuan berbasis **peta interaktif**
+* 📡 Sistem **notifikasi berbasis lokasi**
+* 📏 Validasi lokasi menggunakan **Geo-Fencing**
+* 📸 Transparansi melalui **dokumentasi bantuan**
+* ⭐ Sistem **rating & pelaporan**
+
+---
+
+## 👥 Aktor dalam Sistem
+
+### 1. Donatur
+
+Pengguna yang memberikan bantuan
+
+### 2. Komunitas
+
+Pihak yang:
+
+* membuat permintaan bantuan
+* menerima bantuan dari donatur
+* mendistribusikan ke target
+
+### 3. Admin
+
+Pihak yang:
+
+* memverifikasi laporan
+* menjaga validitas sistem
+
+---
+
+## 🔄 Konsep Alur Sistem
+
+```text
+Donatur → Komunitas → Target Penerima
 ```
-**2. Jalankan server**
-````bash 
-npm run dev
-````
 
-## 📂 Struktur Direktori Utama
-````bash
-src/
-├── config/        # Koneksi database (pg Pool)
-├── controllers/   # Logika bisnis utama (Auth, Donations, Ratings)
-├── middleware/    # Filter keamanan (JWT verify, Multer upload)
-├── routes/        # Definisi endpoint (API Router)
-└── server.js      # Titik masuk aplikasi (Entry point)
-````
+* Donatur memberikan bantuan
+* Komunitas menyalurkan bantuan
+* Target menerima bantuan
 
-## ✍️ Tim Pengembang
-Agung Nugraha - Backend & System Architecture
+---
+
+## ⚙️ Fitur Utama
+
+### 📍 1. Map-Based Donation System
+
+* Menampilkan titik bantuan dalam bentuk marker
+* Warna berdasarkan urgensi:
+
+  * 🔴 Mendesak
+  * 🟡 Normal
+  * 🟢 Rendah
+
+---
+
+### 📡 2. Smart Notification (Location-Based)
+
+* Notifikasi bantuan dalam radius tertentu (misal 5km)
+
+---
+
+### 📏 3. Geo-Fencing Validation
+
+* Validasi lokasi distribusi bantuan
+* Menggunakan GPS dan perhitungan jarak
+* Threshold: ≤ 100 meter
+
+---
+
+### 📊 4. Status Bantuan
+
+| Status       | Deskripsi        |
+| ------------ | ---------------- |
+| Open Request | Menunggu bantuan |
+| On Progress  | Sedang diproses  |
+| Completed    | Selesai          |
+
+---
+
+### 📸 5. Dokumentasi Bantuan
+
+* Upload foto bukti distribusi
+* Transparansi kepada donatur
+
+---
+
+### ⭐ 6. Rating System
+
+* Donatur memberi penilaian
+* Meningkatkan kepercayaan sistem
+
+---
+
+### 🚨 7. Sistem Pelaporan
+
+* Melaporkan bantuan fiktif
+* Verifikasi oleh admin
+
+---
+
+### 🔍 8. Filter & Search
+
+* Berdasarkan:
+
+  * jarak
+  * kategori
+  * urgensi
+
+---
+
+## 🧩 Fitur Berdasarkan Role
+
+### 👤 Donatur
+
+* Melihat peta bantuan
+* Mencari bantuan terdekat
+* Melihat detail bantuan
+* Menyalurkan bantuan
+* Memberi rating
+* Melaporkan bantuan
+
+---
+
+### 🏘 Komunitas
+
+* Membuat permintaan bantuan
+* Menentukan lokasi & urgensi
+* Menerima bantuan dari donatur
+* Menyalurkan bantuan ke target
+* Upload dokumentasi
+* Update status bantuan
+
+---
+
+### 🛠 Admin
+
+* Verifikasi laporan
+* Moderasi sistem
+* Menghapus data tidak valid
+
+---
+
+## 🧠 Arsitektur Sistem
+
+### Teknologi yang digunakan:
+
+* **Frontend**: Flutter (Dart)
+* **Backend**: Firebase
+* **Database**: Cloud Firestore
+* **Authentication**: Firebase Auth
+* **Maps API**: Google Maps Platform
+* **Location**: GPS / Geo-Fencing
+
+---
+
+## 🗂 Struktur Data (Entity)
+
+* User
+* Request Bantuan
+* Distribusi Bantuan
+* Dokumentasi
+* Rating
+* Laporan
+
+---
+
+## 🔄 Alur Utama Sistem
+
+1. Komunitas membuat permintaan bantuan
+2. Sistem broadcast ke donatur
+3. Donatur menerima dan memilih bantuan
+4. Donatur menyalurkan bantuan ke komunitas
+5. Komunitas mendistribusikan ke target
+6. Sistem validasi lokasi (geo-fencing)
+7. Komunitas upload dokumentasi
+8. Status menjadi **Completed**
+9. Donatur memberikan rating
+
+---
+
+## 🎨 Struktur Antarmuka
+
+### Halaman utama:
+
+* Home (Dashboard)
+* Maps (Peta Bantuan)
+* Tambah (+)
+* Notifikasi
+* Profile
+
+---
+
+## 🔐 Kebutuhan Non-Fungsional
+
+* 🔒 Keamanan data (enkripsi)
+* ⚡ Performa real-time
+* 📱 UI/UX sederhana & intuitif
+* 📈 Skalabilitas tinggi
+* 🔍 Akurasi lokasi tinggi
+
+---
+
+## 🚀 Keunggulan Aplikasi
+
+* ✔ Berbasis lokasi (LBS)
+* ✔ Distribusi bantuan lebih merata
+* ✔ Transparansi tinggi
+* ✔ Sistem anti-fraud (geo-fencing + laporan)
+* ✔ Cocok untuk komunitas kecil
+
+---
+
+## 📈 Potensi Pengembangan
+
+* Heatmap distribusi bantuan
+* AI rekomendasi lokasi bantuan
+* Integrasi pembayaran digital
+* Sistem reputasi lanjutan
+* Dashboard analitik admin
+
+---
+
+## 🎯 Tujuan Akhir
+
+Mewujudkan platform yang:
+
+> “Tidak hanya mempermudah memberi, tetapi memastikan setiap bantuan sampai ke tempat yang tepat.”
+
+---
+
+## 👨‍💻 Tim Pengembang
+
+Kelompok 4 – Informatika
+UIN Sunan Kalijaga Yogyakarta
+
+* Agung Nugraha
+* Ibnu Zaki
+* Ahmad Zamroni Trikarta
+* Ahmad Mustofa Aslam
+
+---
+
+## 📌 Penutup
+
+Aplikasi **ada titik?** bukan hanya solusi teknologi, tetapi juga upaya untuk membangun ekosistem kebaikan yang:
+
+* transparan
+* terukur
+* dan berdampak nyata
+
+---
+
+✨ *“Kebaikan itu ada, tinggal kita temukan titiknya.”*

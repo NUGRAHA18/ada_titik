@@ -1,5 +1,34 @@
 import pool from '../config/db.js';
 
+export const getRatingsByPoint = async (req, res) => {
+    const { point_id } = req.params;
+
+    try {
+        const query = `
+            SELECT r.id, r.score, r.review, r.created_at,
+                   u.name AS reviewer_name
+            FROM ratings r
+            JOIN users u ON r.given_by = u.id
+            WHERE r.point_id = $1
+            ORDER BY r.created_at DESC
+        `;
+        const result = await pool.query(query, [point_id]);
+
+        const avgQuery = `SELECT COALESCE(AVG(score), 0) AS avg_score FROM ratings WHERE point_id = $1`;
+        const avgResult = await pool.query(avgQuery, [point_id]);
+
+        res.status(200).json({
+            message: "Data rating berhasil diambil",
+            avg_score: parseFloat(parseFloat(avgResult.rows[0].avg_score).toFixed(1)),
+            count: result.rowCount,
+            data: result.rows
+        });
+    } catch (error) {
+        console.error("Error Get Ratings:", error);
+        res.status(500).json({ error: "Terjadi kesalahan pada server" });
+    }
+};
+
 export const giveRating = async (req, res) => {
     const { point_id, score, review } = req.body;
     const { userId } = req.user; // Dari token JWT (Donatur)

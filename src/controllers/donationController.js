@@ -38,28 +38,97 @@ export const createDonationPoint = async (req, res) => {
   }
 };
 
-// Fungsi Ambil Semua Titik Bantuan (Untuk Peta)
+// Fungsi Ambil Semua Titik Bantuan (Untuk Peta) dengan Filter
 export const getDonationPoints = async (req, res) => {
+  const { urgency, status } = req.query;
+
+  const validUrgencies = ['Mendesak', 'Normal', 'Rendah'];
+  const validStatuses = ['Open', 'On Progress', 'Completed'];
+
+  if (urgency && !validUrgencies.includes(urgency)) {
+    return res.status(400).json({ error: "Nilai urgency tidak valid. Gunakan: Mendesak, Normal, atau Rendah" });
+  }
+  if (status && !validStatuses.includes(status)) {
+    return res.status(400).json({ error: "Nilai status tidak valid. Gunakan: Open, On Progress, atau Completed" });
+  }
+
   try {
-    // Mengubah format PostGIS kembali menjadi Longitude & Latitude agar mudah dibaca Frontend
+    const conditions = [];
+    const values = [];
+    let idx = 1;
+
+    if (status) {
+      conditions.push(`status = $${idx++}`);
+      values.push(status);
+    } else {
+      // Default: tampilkan hanya yang Open
+      conditions.push(`status = 'Open'`);
+    }
+
+    if (urgency) {
+      conditions.push(`urgency = $${idx++}`);
+      values.push(urgency);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const query = `
-            SELECT id, title, description, status, urgency, 
-                   ST_X(location::geometry) AS longitude, 
-                   ST_Y(location::geometry) AS latitude 
+            SELECT id, title, description, status, urgency, created_at,
+                   ST_X(location::geometry) AS longitude,
+                   ST_Y(location::geometry) AS latitude
             FROM donation_points
-            WHERE status = 'Open'
+            ${whereClause}
+            ORDER BY created_at DESC
         `;
 
-    const result = await pool.query(query);
+    const result = await pool.query(query, values);
 
     res.status(200).json({
       message: "Data titik bantuan berhasil diambil",
+      count: result.rowCount,
       data: result.rows,
     });
   } catch (error) {
     console.error("Error Get Donation Points:", error);
     res.status(500).json({ error: "Terjadi kesalahan pada server" });
   }
+};
+
+// Fungsi Ambil Detail Satu Titik Bantuan
+export const getDonationPointById = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const query = `
+            SELECT dp.id, dp.title, dp.description, dp.status, dp.urgency,
+                   dp.created_at, dp.created_by,
+                   ST_X(dp.location::geometry) AS longitude,
+                   ST_Y(dp.location::geometry) AS latitude,
+                   u.name AS creator_name,
+                   COALESCE(AVG(r.score), 0) AS avg_rating,
+                   COUNT(DISTINCT r.id) AS total_ratings,
+                   COUNT(DISTINCT d.id) AS total_docs
+            FROM donation_points dp
+            LEFT JOIN users u ON dp.created_by = u.id
+            LEFT JOIN ratings r ON dp.id = r.point_id
+            LEFT JOIN documentation d ON dp.id = d.point_id
+            WHERE dp.id = $1
+            GROUP BY dp.id, u.name
+        `;
+        const result = await pool.query(query, [id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Titik bantuan tidak ditemukan" });
+        }
+
+        res.status(200).json({
+            message: "Detail titik bantuan berhasil diambil",
+            data: result.rows[0]
+        });
+    } catch (error) {
+        console.error("Error Get Donation Point By Id:", error);
+        res.status(500).json({ error: "Terjadi kesalahan pada server" });
+    }
 };
 
 export const getNearbyDonations = async (req, res) => {
@@ -101,62 +170,91 @@ export const getNearbyDonations = async (req, res) => {
 // Fungsi Update Status Bantuan dengan Geo-Fencing
 export const updateDonationStatus = async (req, res) => {
     const { id } = req.params;
-    const { status, user_lat, user_lng } = req.body; // Minta koordinat device user
-    const { userId } = req.user;
+    const { status, user_lat, user_lng } = req.body;
+    const { userId, role } = req.user;
 
-    // Validasi Input Dasar
-    if (!status || !['Open', 'On Progress', 'Completed'].includes(status)) {
-        return res.status(400).json({ error: "Status tidak valid" });
-    }
-    if (!user_lat || !user_lng) {
-        return res.status(400).json({ error: "Koordinat pengguna saat ini wajib dikirimkan" });
+    const allowedStatuses = ['On Progress', 'Completed'];
+    if (!status || !allowedStatuses.includes(status)) {
+        return res.status(400).json({ error: "Status tidak valid. Gunakan 'On Progress' atau 'Completed'" });
     }
 
     try {
-        // Ambil data titik dan hitung jaraknya dengan lokasi user (dalam meter)
+        // 1. Ambil data titik saat ini
         const checkQuery = `
-            SELECT created_by,
+            SELECT status, created_by,
                    ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance_meters
-            FROM donation_points 
-            WHERE id = $3
+            FROM donation_points WHERE id = $3
         `;
-        // PostGIS: ST_MakePoint(Longitude, Latitude)
-        const checkResult = await pool.query(checkQuery, [user_lng, user_lat, id]);
+        const checkResult = await pool.query(checkQuery, [user_lng || 0, user_lat || 0, id]);
 
-        if (checkResult.rowCount === 0) {
-            return res.status(404).json({ error: "Titik bantuan tidak ditemukan" });
+        if (checkResult.rowCount === 0) return res.status(404).json({ error: "Titik tidak ditemukan" });
+
+        const currentData = checkResult.rows[0];
+
+        // 2. LOGIKA TRANSISI STATUS (Sesuai Diagram)
+        
+        // A. Transisi ke 'On Progress' (Bisa dilakukan Donatur/Komunitas lain)
+        if (status === 'On Progress') {
+            if (currentData.status !== 'Open') {
+                return res.status(400).json({ error: "Hanya bantuan 'Open' yang bisa diproses" });
+            }
+        } 
+
+        // B. Transisi ke 'Completed' (Wajib Geo-fencing & Pembuat Titik)
+        else if (status === 'Completed') {
+            if (currentData.status !== 'On Progress') {
+                return res.status(400).json({ error: "Bantuan harus berstatus 'On Progress' sebelum diselesaikan" });
+            }
+            if (currentData.created_by !== userId) {
+                return res.status(403).json({ error: "Hanya Komunitas pengelola yang bisa menyelesaikan ini" });
+            }
+            if (!user_lat || !user_lng || currentData.distance_meters > 100) {
+                return res.status(403).json({ 
+                    error: `Geo-fencing gagal. Jarak Anda: ${Math.round(currentData.distance_meters)}m (Maks 100m)` 
+                });
+            }
         }
 
-        const { created_by, distance_meters } = checkResult.rows[0];
-
-        // Verifikasi Kepemilikan
-        if (created_by !== userId) {
-            return res.status(403).json({ error: "Akses ditolak. Hanya pembuat yang dapat mengubah status" });
-        }
-
-        // Verifikasi Geo-Fencing (Radius Maksimal 100 Meter)
-        if (distance_meters > 100) {
-            return res.status(403).json({ 
-                error: `Geo-Fencing gagal. Anda berada ${Math.round(distance_meters)} meter dari lokasi. Jarak maksimal adalah 100 meter.` 
-            });
-        }
-
-        // Update Status
-        const updateQuery = `
-            UPDATE donation_points 
-            SET status = $1 
-            WHERE id = $2 
-            RETURNING id, title, status
-        `;
-        const updateResult = await pool.query(updateQuery, [status, id]);
+        // 3. Eksekusi Update
+        const updateQuery = `UPDATE donation_points SET status = $1 WHERE id = $2 RETURNING *`;
+        const result = await pool.query(updateQuery, [status, id]);
 
         res.status(200).json({
-            message: "Status bantuan berhasil diperbarui",
-            data: updateResult.rows[0]
+            message: `Status berhasil diubah menjadi ${status}`,
+            data: result.rows[0]
         });
 
     } catch (error) {
-        console.error("Error Update Status:", error);
-        res.status(500).json({ error: "Terjadi kesalahan pada server" });
+        console.error(error);
+        res.status(500).json({ error: "Terjadi kesalahan server" });
+    }
+};
+
+export const getNearbyNotifications = async (req, res) => {
+    const { lat, lng, radius = 5000 } = req.query; // Default radius 5km
+
+    if (!lat || !lng) {
+        return res.status(400).json({ error: "Lokasi saat ini (lat, lng) diperlukan" });
+    }
+
+    try {
+        const query = `
+            SELECT id, title, urgency, 
+                   ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance
+            FROM donation_points
+            WHERE status = 'Open' 
+              AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($1, $2), 4326), $3)
+            ORDER BY created_at DESC
+            LIMIT 5
+        `;
+        const result = await pool.query(query, [lng, lat, radius]);
+
+        res.status(200).json({
+            message: "Data notifikasi bantuan terdekat berhasil diambil",
+            data: result.rows
+        });
+    } catch (error) {
+        console.error("Error Get Notifications:", error);
+        res.status(500).json({ error: "Gagal mengambil data notifikasi" });
     }
 };
