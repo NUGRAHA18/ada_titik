@@ -1,19 +1,22 @@
-# 1. Dependensi (Bisa diinstal ulang via npm install)
+# Dependensi
 node_modules/
 
-# 2. Environment Variables (Rahasia, jangan sampai bocor ke publik!)
+# Environment Variables — JANGAN commit file .env asli!
 .env
 .env.*
 !.env.example
 
-# 3. Folder Upload (Data foto lokal tidak perlu masuk ke repository)
+# Folder upload foto (data lokal, masuk volume Docker di production)
 uploads/
 
-# 4. Log Files (Catatan error lokal)
+# Log files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# 5. OS Generated Files (File sampah dari sistem operasi)
+# OS generated
 .DS_Store
 Thumbs.db
+
+# Claude Code (konfigurasi lokal)
+.claude/
