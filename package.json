@@ -5,11 +5,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
-    "dev": "NODE_ENV=development nodemon src/server.js",
-    "start:staging": "NODE_ENV=staging node src/server.js",
-    "start": "NODE_ENV=production node src/server.js",
-    "seed": "node database/seed.js"
+    "dev":            "NODE_ENV=development nodemon src/server.js",
+    "start":          "NODE_ENV=production node src/server.js",
+    "start:staging":  "NODE_ENV=staging node src/server.js",
+    "test":           "jest",
+    "seed":           "node database/seed.js",
+    "docker:build":   "docker compose build --no-cache",
+    "docker:up":      "docker compose up -d",
+    "docker:down":    "docker compose down",
+    "docker:logs":    "docker compose logs -f app",
+    "docker:db":      "docker compose exec db psql -U postgres -d titik_baik",
+    "docker:restart": "docker compose restart app"
   },
   "jest": {
     "testEnvironment": "node",

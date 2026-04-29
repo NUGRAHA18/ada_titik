@@ -1,0 +1,33 @@
+name: CI – Titik Baik
+
+on:
+  pull_request:
+    branches:
+      - staging
+      - main
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout kode
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependensi
+        run: npm ci
+
+      - name: Jalankan test
+        run: npm test
+        env:
+          NODE_ENV: development
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test_secret_ci' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PORT: 3000
