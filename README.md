@@ -12,6 +12,7 @@ Berbeda dengan platform donasi konvensional, aplikasi ini tidak hanya menghubung
 
 ---
 
+
 ## 🎯 Latar Belakang (Studi Kasus)
 
 Dalam praktik di masyarakat, terdapat beberapa permasalahan utama:
