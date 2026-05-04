@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- DONATION POINTS
 -- created_by bertipe UUID karena referensi ke users.id
 -- ============================================================
-CREATE TABLE donation_points (
+CREATE TABLE IF NOT EXISTS donation_points (
     id          SERIAL  PRIMARY KEY,
     created_by  UUID    REFERENCES users(id) ON DELETE SET NULL,
     title       VARCHAR(200)  NOT NULL,
@@ -46,7 +46,7 @@ CREATE INDEX idx_donation_points_active   ON donation_points(deleted_at) WHERE d
 -- ============================================================
 -- DOCUMENTATION (bukti foto distribusi)
 -- ============================================================
-CREATE TABLE documentation (
+CREATE TABLE IF NOT EXISTS documentation (
     id          SERIAL  PRIMARY KEY,
     point_id    INTEGER NOT NULL REFERENCES donation_points(id) ON DELETE CASCADE,
     uploaded_by UUID    REFERENCES users(id) ON DELETE SET NULL,
@@ -60,7 +60,7 @@ CREATE INDEX idx_documentation_point_id ON documentation(point_id);
 -- ============================================================
 -- RATINGS
 -- ============================================================
-CREATE TABLE ratings (
+CREATE TABLE IF NOT EXISTS ratings (
     id       SERIAL  PRIMARY KEY,
     point_id INTEGER NOT NULL REFERENCES donation_points(id) ON DELETE CASCADE,
     given_by UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -75,7 +75,7 @@ CREATE INDEX idx_ratings_point_id ON ratings(point_id);
 -- ============================================================
 -- REPORTS (anti-fraud)
 -- ============================================================
-CREATE TABLE reports (
+CREATE TABLE IF NOT EXISTS reports (
     id          SERIAL  PRIMARY KEY,
     reporter_id UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     point_id    INTEGER NOT NULL REFERENCES donation_points(id) ON DELETE CASCADE,
