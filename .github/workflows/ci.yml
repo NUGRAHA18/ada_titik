@@ -28,6 +28,5 @@ jobs:
         run: npm test
         env:
           NODE_ENV: development
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test_secret_ci' }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test_secret_ci_only' }}
           PORT: 3000
