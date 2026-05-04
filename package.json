@@ -1,5 +1,5 @@
 {
-  "name": "titiik_baik",
+  "name": "titik_baik",
   "version": "1.0.0",
   "type": "module",
   "description": "",
@@ -15,7 +15,8 @@
     "docker:down":    "docker compose down",
     "docker:logs":    "docker compose logs -f app",
     "docker:db":      "docker compose exec db psql -U postgres -d titik_baik",
-    "docker:restart": "docker compose restart app"
+    "docker:restart": "docker compose restart app",
+    "migrate":        "node database/migrate.js"
   },
   "jest": {
     "testEnvironment": "node",

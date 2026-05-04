@@ -18,5 +18,15 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
+# SSL certificates (jangan commit ke git!)
+nginx/ssl/*.pem
+nginx/ssl/*.crt
+nginx/ssl/*.key
+
+# Production env (credentials nyata)
+.env.production
+
 # Claude Code (konfigurasi lokal)
 .claude/
+
+DEPLOY.md
