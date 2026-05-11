@@ -15,11 +15,9 @@ import adminRoutes from './routes/adminRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import { getNearbyNotifications } from './controllers/donationController.js';
-import { errorHandler, healthCheck } from './middleware/errorHandler.js';
 
 const PORT = process.env.PORT || 3000;
 const app  = express();
-app.set('trust proxy', 1);
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
     : null;
@@ -63,9 +61,6 @@ app.use('/api/admin',         adminRoutes);
 app.use('/api/users',         userRoutes);
 app.use('/uploads',           express.static('uploads'));
 app.get('/api/notifications/nearby', verifyToken, getNearbyNotifications);
-app.get('/health', healthCheck);
-
-app.use(errorHandler);
 
 app.listen(PORT, () => {
     const env = process.env.NODE_ENV || 'development';
