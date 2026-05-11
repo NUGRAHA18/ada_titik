@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 
 export const verifyToken = (req, res, next) => {
-  // Ambil token dari header request
   const authHeader = req.header("Authorization");
 
   if (!authHeader) {
@@ -11,12 +10,9 @@ export const verifyToken = (req, res, next) => {
   }
 
   try {
-    // Standar industri menggunakan format "Bearer <token>"
     const token = authHeader.split(" ")[1];
-
-    // Cek keaslian token
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // Simpan data token (userId, role) untuk digunakan nanti
+    req.user = verified; 
 
     next(); 
   } catch (error) {

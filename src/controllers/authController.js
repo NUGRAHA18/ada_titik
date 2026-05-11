@@ -45,7 +45,6 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // 1. Ambil data user, PASTIKAN MENGAMBIL KOLOM 'role'
         const query = `SELECT id, name, email, password_hash, role FROM users WHERE email = $1`;
         const result = await pool.query(query, [email]);
 
@@ -55,23 +54,20 @@ export const login = async (req, res) => {
 
         const user = result.rows[0];
 
-        // 2. Verifikasi Password
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
             return res.status(401).json({ error: "Email atau password salah" });
         }
 
-        // 3. Buat Token JWT dengan menyematkan 'role' di dalamnya
         const token = jwt.sign(
             { 
                 userId: user.id, 
-                role: user.role // <-- Tambahan penting untuk middleware checkRole
+                role: user.role 
             }, 
             process.env.JWT_SECRET, 
             { expiresIn: '1d' }
         );
 
-        // 4. Kirim response yang memudahkan Arbat (Frontend)
         res.status(200).json({
             message: "Login berhasil",
             token: token,
@@ -79,7 +75,7 @@ export const login = async (req, res) => {
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                role: user.role // Frontend akan pakai ini untuk logic "if role == admin -> buka Halaman Admin"
+                role: user.role 
             }
         });
 

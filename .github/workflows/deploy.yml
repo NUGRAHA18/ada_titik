@@ -1,15 +1,4 @@
 name: CD – Deploy Titik Baik
-
-# Railway menangani deployment otomatis via GitHub integration.
-# Tidak ada aksi SSH/Docker yang perlu dijalankan di sini.
-#
-# Setup Railway (lakukan sekali di Railway Dashboard):
-#   1. New Project → Deploy from GitHub repo → pilih repo ini
-#   2. Buat 3 service: development, staging, production
-#   3. Tiap service: Settings → Source → pilih branch yang sesuai
-#   4. Settings → Deploy → centang "Wait for CI" agar Railway hanya
-#      deploy jika workflow CI (lint-and-test) di atas berhasil
-
 on:
   push:
     branches:
