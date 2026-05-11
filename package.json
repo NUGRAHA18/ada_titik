@@ -5,25 +5,28 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev":            "NODE_ENV=development nodemon src/server.js",
-    "start":          "NODE_ENV=production node src/server.js",
-    "start:staging":  "NODE_ENV=staging node src/server.js",
-    "test":           "jest",
-    "seed":           "node database/seed.js",
-    "docker:build":   "docker compose build --no-cache",
-    "docker:up":      "docker compose up -d",
-    "docker:down":    "docker compose down",
-    "docker:logs":    "docker compose logs -f app",
-    "docker:db":      "docker compose exec db psql -U postgres -d titik_baik",
+    "dev": "cross-env NODE_ENV=development nodemon src/server.js",
+    "start": "NODE_ENV=production node src/server.js",
+    "start:staging": "NODE_ENV=staging node src/server.js",
+    "test": "jest",
+    "seed": "node database/seed.js",
+    "docker:build": "docker compose build --no-cache",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f app",
+    "docker:db": "docker compose exec db psql -U postgres -d titik_baik",
     "docker:restart": "docker compose restart app",
-    "migrate":        "node database/migrate.js"
+    "migrate": "node database/migrate.js",
+    "lint": "eslint src/"
   },
   "jest": {
     "testEnvironment": "node",
     "transform": {
       "^.+\\.js$": "babel-jest"
     },
-    "testMatch": ["**/tests/**/*.test.js"]
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
   },
   "keywords": [],
   "author": "",
@@ -44,6 +47,8 @@
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.2",
     "babel-jest": "^30.3.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^8.57.1",
     "jest": "^30.3.0",
     "nodemon": "^3.1.14"
   }

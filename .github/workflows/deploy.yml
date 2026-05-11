@@ -1,40 +1,29 @@
 name: CD – Deploy Titik Baik
 
+# Railway menangani deployment otomatis via GitHub integration.
+# Tidak ada aksi SSH/Docker yang perlu dijalankan di sini.
+#
+# Setup Railway (lakukan sekali di Railway Dashboard):
+#   1. New Project → Deploy from GitHub repo → pilih repo ini
+#   2. Buat 3 service: development, staging, production
+#   3. Tiap service: Settings → Source → pilih branch yang sesuai
+#   4. Settings → Deploy → centang "Wait for CI" agar Railway hanya
+#      deploy jika workflow CI (lint-and-test) di atas berhasil
+
 on:
   push:
     branches:
-      - main      # → production
-      - staging   # → staging
+      - main
+      - staging
+      - development
 
 jobs:
-  deploy:
-    name: Deploy via SSH
+  railway-will-deploy:
+    name: Railway auto-deploy (triggered by push)
     runs-on: ubuntu-latest
-
     steps:
-      - name: Deploy ke VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host:     ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key:      ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cd /opt/titik-baik
-
-            git fetch origin
-            if [ "${{ github.ref_name }}" = "main" ]; then
-              git checkout main && git pull origin main
-              docker compose down
-              docker compose build --no-cache
-              docker compose up -d
-              docker compose exec -T app node database/migrate.js
-              echo "✅ Production deployed"
-            else
-              git checkout staging && git pull origin staging
-              docker compose -f docker-compose.staging.yml down
-              docker compose -f docker-compose.staging.yml build --no-cache
-              docker compose -f docker-compose.staging.yml up -d
-              docker compose -f docker-compose.staging.yml exec -T app node database/migrate.js
-              echo "✅ Staging deployed"
-            fi
+      - name: Deployment handled by Railway
+        run: |
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Railway akan men-deploy branch ini secara otomatis setelah CI pass."
+          echo "Cek status di: https://railway.app/dashboard"
