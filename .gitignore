@@ -27,6 +27,6 @@ nginx/ssl/*.key
 .env.production
 
 # Claude Code (konfigurasi lokal)
-.claude/
+.claude
 
 DEPLOY.md

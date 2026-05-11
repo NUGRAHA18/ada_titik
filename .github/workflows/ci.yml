@@ -1,14 +1,16 @@
 name: CI – Titik Baik
 
 on:
+  push:
+    branches: ["**"]
   pull_request:
     branches:
       - staging
       - main
 
 jobs:
-  test:
-    name: Run Tests
+  lint-and-test:
+    name: Lint & Test
     runs-on: ubuntu-latest
 
     steps:
@@ -19,14 +21,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
 
       - name: Install dependensi
         run: npm ci
 
-      - name: Jalankan test
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Unit Test (Jest)
         run: npm test
         env:
-          NODE_ENV: development
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test_secret_ci_only' }}
+          NODE_ENV: test
+          JWT_SECRET: test_secret_ci_only
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/titik_baik
           PORT: 3000
