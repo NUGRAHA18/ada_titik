@@ -30,3 +30,5 @@ nginx/ssl/*.key
 .claude
 
 DEPLOY.md
+postman
+API_DOCUMENTATION.md

@@ -2,7 +2,7 @@ import pool from '../config/db.js';
 
 export const createReport = async (req, res) => {
     const { point_id, reason } = req.body;
-    const { userId } = req.user; // ID Donatur dari token
+    const { userId } = req.user; 
 
     if (!point_id || !reason) {
         return res.status(400).json({ error: "ID titik dan alasan laporan wajib diisi" });

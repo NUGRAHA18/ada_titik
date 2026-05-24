@@ -11,6 +11,10 @@ export const validate = (req, res, next) => {
     next();
 };
 
+const VALID_CATEGORIES = ['Pangan','Medis','Pendidikan','Infrastruktur','Pakaian','Lainnya','Umum'];
+const VALID_POST_TYPES = ['bantuanDibutuhkan','pertanyaan','updateKomunitas','inspirasi','kisahSukses'];
+const VALID_TABS       = ['terbaru','populer','diskusi'];
+
 export const registerRules = [
     body('name').trim().notEmpty().withMessage('Nama wajib diisi')
         .isLength({ max: 100 }).withMessage('Nama maksimal 100 karakter'),
@@ -31,6 +35,9 @@ export const createDonationRules = [
     body('latitude').isFloat({ min: -90, max: 90 }).withMessage('Latitude tidak valid (-90 s/d 90)'),
     body('urgency').optional().isIn(['Mendesak', 'Normal', 'Rendah'])
         .withMessage("Urgency harus 'Mendesak', 'Normal', atau 'Rendah'"),
+    body('category').optional().isIn(VALID_CATEGORIES)
+        .withMessage(`Category harus salah satu: ${VALID_CATEGORIES.join(', ')}`),
+    body('goal_amount').optional().isFloat({ min: 0 }).withMessage('goal_amount tidak boleh negatif'),
     body('description').optional().isString().trim(),
 ];
 
@@ -39,6 +46,9 @@ export const updateDonationRules = [
         .isLength({ max: 200 }).withMessage('Judul maksimal 200 karakter'),
     body('urgency').optional().isIn(['Mendesak', 'Normal', 'Rendah'])
         .withMessage("Urgency harus 'Mendesak', 'Normal', atau 'Rendah'"),
+    body('category').optional().isIn(VALID_CATEGORIES)
+        .withMessage(`Category harus salah satu: ${VALID_CATEGORIES.join(', ')}`),
+    body('goal_amount').optional().isFloat({ min: 0 }).withMessage('goal_amount tidak boleh negatif'),
     body('description').optional().isString().trim(),
 ];
 
@@ -67,10 +77,38 @@ export const updateProfileRules = [
         .isLength({ max: 100 }).withMessage('Nama maksimal 100 karakter'),
     body('bio').optional().isString().trim()
         .isLength({ max: 500 }).withMessage('Bio maksimal 500 karakter'),
+    body('avatar_url').optional({ nullable: true }).isURL().withMessage('avatar_url harus berupa URL valid')
+        .isLength({ max: 500 }).withMessage('avatar_url maksimal 500 karakter'),
 ];
 
 export const nearbyQueryRules = [
     query('lat').isFloat({ min: -90, max: 90 }).withMessage('Parameter lat tidak valid'),
     query('lng').isFloat({ min: -180, max: 180 }).withMessage('Parameter lng tidak valid'),
     query('radius').isFloat({ min: 1 }).withMessage('Radius harus lebih dari 0 meter'),
+];
+
+export const notificationQueryRules = [
+    query('lat').isFloat({ min: -90, max: 90 }).withMessage('Parameter lat tidak valid'),
+    query('lng').isFloat({ min: -180, max: 180 }).withMessage('Parameter lng tidak valid'),
+    query('radius').optional().isFloat({ min: 1 }).withMessage('Radius harus lebih dari 0 meter'),
+    query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit antara 1 sampai 50'),
+];
+
+export const createPostRules = [
+    body('content').trim().notEmpty().withMessage('Konten postingan wajib diisi')
+        .isLength({ max: 5000 }).withMessage('Konten maksimal 5000 karakter'),
+    body('post_type').optional().isIn(VALID_POST_TYPES)
+        .withMessage(`Post type harus salah satu: ${VALID_POST_TYPES.join(', ')}`),
+    body('image_url').optional({ nullable: true }).isURL().withMessage('image_url harus berupa URL valid')
+        .isLength({ max: 500 }).withMessage('image_url maksimal 500 karakter'),
+];
+
+export const createCommentRules = [
+    body('content').trim().notEmpty().withMessage('Konten komentar wajib diisi')
+        .isLength({ max: 2000 }).withMessage('Komentar maksimal 2000 karakter'),
+];
+
+export const communityTabRules = [
+    query('tab').optional().isIn(VALID_TABS)
+        .withMessage(`tab harus salah satu: ${VALID_TABS.join(', ')}`),
 ];

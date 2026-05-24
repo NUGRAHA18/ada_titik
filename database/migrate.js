@@ -6,10 +6,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Urutan migrasi — jangan ubah urutan, hanya tambah di akhir
 const MIGRATIONS = [
     'schema.sql',
     'migration_v2.sql',
+    'migration_v3.sql',
 ];
 
 async function migrate() {
