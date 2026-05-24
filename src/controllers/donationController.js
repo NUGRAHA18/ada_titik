@@ -2,7 +2,7 @@ import pool from "../config/db.js";
 
 export const createDonationPoint = async (req, res) => {
     const { userId } = req.user;
-    const { title, description, longitude, latitude, urgency } = req.body;
+    const { title, description, longitude, latitude, urgency, category, goal_amount } = req.body;
 
     if (!title || !longitude || !latitude) {
         return res.status(400).json({ error: "Judul dan koordinat (longitude, latitude) wajib diisi" });
@@ -10,10 +10,19 @@ export const createDonationPoint = async (req, res) => {
 
     try {
         const result = await pool.query(`
-            INSERT INTO donation_points (created_by, title, description, location, urgency)
-            VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6)
-            RETURNING id, title, status, urgency
-        `, [userId, title, description, longitude, latitude, urgency || 'Normal']);
+            INSERT INTO donation_points (created_by, title, description, location, urgency, category, goal_amount)
+            VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, $7, $8)
+            RETURNING id, title, status, urgency, category, goal_amount
+        `, [
+            userId,
+            title,
+            description,
+            longitude,
+            latitude,
+            urgency  || 'Normal',
+            category || 'Umum',
+            goal_amount || 0,
+        ]);
 
         res.status(201).json({ message: "Titik bantuan berhasil ditambahkan", data: result.rows[0] });
     } catch (error) {
@@ -23,10 +32,11 @@ export const createDonationPoint = async (req, res) => {
 };
 
 export const getDonationPoints = async (req, res) => {
-    const { urgency, status, search, page = 1, limit = 10 } = req.query;
+    const { urgency, status, category, search, page = 1, limit = 10 } = req.query;
 
-    const validUrgencies = ['Mendesak', 'Normal', 'Rendah'];
-    const validStatuses  = ['Open', 'On Progress', 'Completed'];
+    const validUrgencies  = ['Mendesak', 'Normal', 'Rendah'];
+    const validStatuses   = ['Open', 'On Progress', 'Completed'];
+    const validCategories = ['Pangan','Medis','Pendidikan','Infrastruktur','Pakaian','Lainnya','Umum'];
 
     if (urgency && !validUrgencies.includes(urgency)) {
         return res.status(400).json({ error: "Nilai urgency tidak valid. Gunakan: Mendesak, Normal, atau Rendah" });
@@ -34,30 +44,38 @@ export const getDonationPoints = async (req, res) => {
     if (status && !validStatuses.includes(status)) {
         return res.status(400).json({ error: "Nilai status tidak valid. Gunakan: Open, On Progress, atau Completed" });
     }
+    if (category && !validCategories.includes(category)) {
+        return res.status(400).json({ error: `Nilai category tidak valid. Gunakan salah satu: ${validCategories.join(', ')}` });
+    }
 
     const pageNum  = Math.max(1, parseInt(page)  || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 10));
     const offset   = (pageNum - 1) * limitNum;
 
     try {
-        const conditions = ['deleted_at IS NULL'];
+        const conditions = ['dp.deleted_at IS NULL'];
         const values = [];
         let idx = 1;
 
         if (status) {
-            conditions.push(`status = $${idx++}`);
+            conditions.push(`dp.status = $${idx++}`);
             values.push(status);
         } else {
-            conditions.push(`status = 'Open'`);
+            conditions.push(`dp.status = 'Open'`);
         }
 
         if (urgency) {
-            conditions.push(`urgency = $${idx++}`);
+            conditions.push(`dp.urgency = $${idx++}`);
             values.push(urgency);
         }
 
+        if (category) {
+            conditions.push(`dp.category = $${idx++}`);
+            values.push(category);
+        }
+
         if (search) {
-            conditions.push(`(title ILIKE $${idx} OR description ILIKE $${idx})`);
+            conditions.push(`(dp.title ILIKE $${idx} OR dp.description ILIKE $${idx})`);
             values.push(`%${search}%`);
             idx++;
         }
@@ -67,13 +85,17 @@ export const getDonationPoints = async (req, res) => {
         values.push(limitNum, offset);
 
         const result = await pool.query(`
-            SELECT id, title, description, status, urgency, created_at,
-                   ST_X(location::geometry) AS longitude,
-                   ST_Y(location::geometry) AS latitude,
+            SELECT dp.id, dp.title, dp.description, dp.status, dp.urgency,
+                   dp.category, dp.goal_amount, dp.collected_amount, dp.created_at,
+                   ST_X(dp.location::geometry) AS longitude,
+                   ST_Y(dp.location::geometry) AS latitude,
+                   u.name AS author_name,
+                   u.avatar_url AS author_avatar,
                    COUNT(*) OVER() AS total_count
-            FROM donation_points
+            FROM donation_points dp
+            LEFT JOIN users u ON dp.created_by = u.id
             WHERE ${conditions.join(' AND ')}
-            ORDER BY created_at DESC
+            ORDER BY dp.created_at DESC
             LIMIT $${limitIdx} OFFSET $${offsetIdx}
         `, values);
 
@@ -101,10 +123,12 @@ export const getDonationPointById = async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT dp.id, dp.title, dp.description, dp.status, dp.urgency,
+                   dp.category, dp.goal_amount, dp.collected_amount,
                    dp.created_at, dp.created_by,
                    ST_X(dp.location::geometry) AS longitude,
                    ST_Y(dp.location::geometry) AS latitude,
                    u.name AS creator_name,
+                   u.avatar_url AS creator_avatar,
                    COALESCE(AVG(r.score), 0) AS avg_rating,
                    COUNT(DISTINCT r.id)       AS total_ratings,
                    COUNT(DISTINCT d.id)       AS total_docs
@@ -113,7 +137,7 @@ export const getDonationPointById = async (req, res) => {
             LEFT JOIN ratings r       ON dp.id = r.point_id
             LEFT JOIN documentation d ON dp.id = d.point_id
             WHERE dp.id = $1 AND dp.deleted_at IS NULL
-            GROUP BY dp.id, u.name
+            GROUP BY dp.id, u.name, u.avatar_url
         `, [id]);
 
         if (result.rowCount === 0) {
@@ -136,7 +160,8 @@ export const getNearbyDonations = async (req, res) => {
 
     try {
         const result = await pool.query(`
-            SELECT id, title, description, status, urgency,
+            SELECT id, title, description, status, urgency, category,
+                   goal_amount, collected_amount,
                    ST_X(location::geometry) AS longitude,
                    ST_Y(location::geometry) AS latitude,
                    ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance_meters
@@ -212,11 +237,14 @@ export const updateDonationStatus = async (req, res) => {
 
 export const updateDonationPoint = async (req, res) => {
     const { id } = req.params;
-    const { title, description, urgency } = req.body;
+    const { title, description, urgency, category, goal_amount } = req.body;
     const { userId } = req.user;
 
-    if (!title && description === undefined && !urgency) {
-        return res.status(400).json({ error: "Minimal satu field (title, description, urgency) harus diisi" });
+    if (
+        !title && description === undefined && !urgency &&
+        !category && goal_amount === undefined
+    ) {
+        return res.status(400).json({ error: "Minimal satu field (title, description, urgency, category, goal_amount) harus diisi" });
     }
 
     try {
@@ -237,13 +265,15 @@ export const updateDonationPoint = async (req, res) => {
         const values = [];
         let idx = 1;
 
-        if (title)                    { fields.push(`title = $${idx++}`);       values.push(title); }
-        if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
-        if (urgency)                  { fields.push(`urgency = $${idx++}`);     values.push(urgency); }
+        if (title)                     { fields.push(`title = $${idx++}`);        values.push(title); }
+        if (description !== undefined) { fields.push(`description = $${idx++}`);  values.push(description); }
+        if (urgency)                   { fields.push(`urgency = $${idx++}`);      values.push(urgency); }
+        if (category)                  { fields.push(`category = $${idx++}`);     values.push(category); }
+        if (goal_amount !== undefined) { fields.push(`goal_amount = $${idx++}`);  values.push(goal_amount); }
         values.push(id);
 
         const result = await pool.query(
-            `UPDATE donation_points SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, title, description, urgency, status`,
+            `UPDATE donation_points SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, title, description, urgency, status, category, goal_amount`,
             values
         );
 
@@ -251,30 +281,5 @@ export const updateDonationPoint = async (req, res) => {
     } catch (error) {
         console.error("Error Update Donation Point:", error);
         res.status(500).json({ error: "Terjadi kesalahan pada server" });
-    }
-};
-
-export const getNearbyNotifications = async (req, res) => {
-    const { lat, lng, radius = 5000 } = req.query;
-
-    if (!lat || !lng) {
-        return res.status(400).json({ error: "Lokasi saat ini (lat, lng) diperlukan" });
-    }
-
-    try {
-        const result = await pool.query(`
-            SELECT id, title, urgency,
-                   ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance
-            FROM donation_points
-            WHERE status = 'Open' AND deleted_at IS NULL
-              AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($1, $2), 4326), $3)
-            ORDER BY created_at DESC
-            LIMIT 5
-        `, [lng, lat, radius]);
-
-        res.status(200).json({ message: "Data notifikasi bantuan terdekat berhasil diambil", data: result.rows });
-    } catch (error) {
-        console.error("Error Get Notifications:", error);
-        res.status(500).json({ error: "Gagal mengambil data notifikasi" });
     }
 };

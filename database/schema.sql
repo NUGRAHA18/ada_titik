@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255)  NOT NULL,
     role          VARCHAR(20)   NOT NULL CHECK (role IN ('donatur', 'komunitas', 'admin')),
     bio           TEXT,
+    avatar_url    VARCHAR(500),
     created_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -25,22 +26,27 @@ CREATE TABLE IF NOT EXISTS users (
 -- created_by bertipe UUID karena referensi ke users.id
 -- ============================================================
 CREATE TABLE IF NOT EXISTS donation_points (
-    id          SERIAL  PRIMARY KEY,
-    created_by  UUID    REFERENCES users(id) ON DELETE SET NULL,
-    title       VARCHAR(200)  NOT NULL,
-    description TEXT,
-    location    GEOMETRY(Point, 4326) NOT NULL,
-    urgency     VARCHAR(20)   NOT NULL DEFAULT 'Normal'
-                    CHECK (urgency IN ('Mendesak', 'Normal', 'Rendah')),
-    status      VARCHAR(20)   NOT NULL DEFAULT 'Open'
-                    CHECK (status IN ('Open', 'On Progress', 'Completed')),
-    deleted_at  TIMESTAMP WITH TIME ZONE NULL,
-    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id               SERIAL  PRIMARY KEY,
+    created_by       UUID    REFERENCES users(id) ON DELETE SET NULL,
+    title            VARCHAR(200)  NOT NULL,
+    description      TEXT,
+    location         GEOMETRY(Point, 4326) NOT NULL,
+    urgency          VARCHAR(20)   NOT NULL DEFAULT 'Normal'
+                         CHECK (urgency IN ('Mendesak', 'Normal', 'Rendah')),
+    status           VARCHAR(20)   NOT NULL DEFAULT 'Open'
+                         CHECK (status IN ('Open', 'On Progress', 'Completed')),
+    category         VARCHAR(50)   NOT NULL DEFAULT 'Umum'
+                         CHECK (category IN ('Pangan','Medis','Pendidikan','Infrastruktur','Pakaian','Lainnya','Umum')),
+    goal_amount      NUMERIC(15,2) NOT NULL DEFAULT 0,
+    collected_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    deleted_at       TIMESTAMP WITH TIME ZONE NULL,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Spatial index (wajib untuk ST_DWithin / ST_Distance)
 CREATE INDEX idx_donation_points_location ON donation_points USING GIST(location);
 CREATE INDEX idx_donation_points_status   ON donation_points(status);
+CREATE INDEX idx_donation_points_category ON donation_points(category);
 CREATE INDEX idx_donation_points_active   ON donation_points(deleted_at) WHERE deleted_at IS NULL;
 
 -- ============================================================
@@ -87,3 +93,43 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE INDEX idx_reports_status   ON reports(status);
 CREATE INDEX idx_reports_point_id ON reports(point_id);
+
+-- ============================================================
+-- COMMUNITY POSTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS community_posts (
+    id          SERIAL PRIMARY KEY,
+    author_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content     TEXT NOT NULL,
+    post_type   VARCHAR(30) NOT NULL DEFAULT 'updateKomunitas'
+                CHECK (post_type IN ('bantuanDibutuhkan','pertanyaan','updateKomunitas','inspirasi','kisahSukses')),
+    image_url   VARCHAR(500),
+    likes_count INT NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_community_posts_created ON community_posts(created_at DESC);
+CREATE INDEX idx_community_posts_type    ON community_posts(post_type);
+
+-- ============================================================
+-- COMMUNITY COMMENTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS community_comments (
+    id          SERIAL PRIMARY KEY,
+    post_id     INT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    author_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content     TEXT NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_community_comments_post ON community_comments(post_id);
+
+-- ============================================================
+-- POST LIKES (toggle, PK kompleks)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS post_likes (
+    post_id    INT  NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (post_id, user_id)
+);

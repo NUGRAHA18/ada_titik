@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS = [
     'schema.sql',
     'migration_v2.sql',
+    'migration_v3.sql',
 ];
 
 async function migrate() {
