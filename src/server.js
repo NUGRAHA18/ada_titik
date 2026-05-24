@@ -5,7 +5,6 @@ import cors from "cors";
 import fs from "fs";
 import morgan from "morgan";
 import rateLimit from 'express-rate-limit';
-import { verifyToken } from "./middleware/authMiddleware.js";
 import authRoutes from "./routes/authRoutes.js";
 import donationRoutes from "./routes/donationRoutes.js";
 import documentationRoutes from './routes/documentationRoutes.js';
@@ -14,7 +13,8 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import userRoutes from './routes/userRoutes.js';
-import { getNearbyNotifications } from './controllers/donationController.js';
+import communityRoutes from './routes/communityRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const PORT = process.env.PORT || 3000;
 const app  = express();
@@ -59,8 +59,9 @@ app.use('/api/analytics',     analyticsRoutes);
 app.use('/api/reports',       reportRoutes);
 app.use('/api/admin',         adminRoutes);
 app.use('/api/users',         userRoutes);
+app.use('/api/community',     communityRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/uploads',           express.static('uploads'));
-app.get('/api/notifications/nearby', verifyToken, getNearbyNotifications);
 
 app.listen(PORT, () => {
     const env = process.env.NODE_ENV || 'development';
