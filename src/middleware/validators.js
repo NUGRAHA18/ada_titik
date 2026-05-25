@@ -112,3 +112,28 @@ export const communityTabRules = [
     query('tab').optional().isIn(VALID_TABS)
         .withMessage(`tab harus salah satu: ${VALID_TABS.join(', ')}`),
 ];
+
+const VALID_CHAT_CONTEXTS = ['post', 'donation_point'];
+
+export const startConversationRules = [
+    body('target_user_id').isUUID().withMessage('target_user_id harus UUID valid'),
+    body('context_type').optional({ nullable: true }).isIn(VALID_CHAT_CONTEXTS)
+        .withMessage(`context_type harus salah satu: ${VALID_CHAT_CONTEXTS.join(', ')}`),
+    body('context_id').optional({ nullable: true }).isInt({ min: 1 })
+        .withMessage('context_id harus integer positif'),
+];
+
+export const sendMessageRules = [
+    body('body').trim().notEmpty().withMessage('Isi pesan wajib diisi')
+        .isLength({ max: 2000 }).withMessage('Pesan maksimal 2000 karakter'),
+];
+
+export const listMessagesRules = [
+    query('before').optional().isInt({ min: 1 }).withMessage('before harus integer positif'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit antara 1 sampai 100'),
+];
+
+export const listConversationsRules = [
+    query('page').optional().isInt({ min: 1 }).withMessage('page harus integer positif'),
+    query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit antara 1 sampai 50'),
+];

@@ -133,3 +133,53 @@ CREATE TABLE IF NOT EXISTS post_likes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (post_id, user_id)
 );
+
+-- ============================================================
+-- CHAT: 1-on-1 conversations + messages
+-- user_a_id < user_b_id agar pasangan unik (A,B) == (B,A)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS chat_conversations (
+    id              SERIAL PRIMARY KEY,
+    user_a_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_b_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    context_type    VARCHAR(20) CHECK (context_type IN ('post', 'donation_point')),
+    context_id      INT,
+    last_message_at TIMESTAMP WITH TIME ZONE,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT chat_conversations_user_order_chk CHECK (user_a_id < user_b_id),
+    CONSTRAINT chat_conversations_pair_unique    UNIQUE (user_a_id, user_b_id)
+);
+
+CREATE INDEX idx_chat_conv_user_a
+    ON chat_conversations(user_a_id, last_message_at DESC NULLS LAST);
+CREATE INDEX idx_chat_conv_user_b
+    ON chat_conversations(user_b_id, last_message_at DESC NULLS LAST);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id              SERIAL PRIMARY KEY,
+    conversation_id INT  NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    sender_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body            TEXT NOT NULL,
+    read_at         TIMESTAMP WITH TIME ZONE,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_chat_messages_conv_created
+    ON chat_messages(conversation_id, created_at DESC);
+CREATE INDEX idx_chat_messages_unread
+    ON chat_messages(conversation_id, sender_id) WHERE read_at IS NULL;
+
+CREATE OR REPLACE FUNCTION chat_touch_conversation()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE chat_conversations
+        SET last_message_at = NEW.created_at
+        WHERE id = NEW.conversation_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_chat_messages_touch_conv ON chat_messages;
+CREATE TRIGGER trg_chat_messages_touch_conv
+    AFTER INSERT ON chat_messages
+    FOR EACH ROW EXECUTE FUNCTION chat_touch_conversation();
