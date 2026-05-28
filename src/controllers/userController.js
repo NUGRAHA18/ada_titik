@@ -132,6 +132,47 @@ export const uploadAvatar = async (req, res) => {
     }
 };
 
+export const getMyPoints = async (req, res) => {
+    const { userId } = req.user;
+    const page   = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit  = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    try {
+        const userRow = await pool.query(
+            `SELECT points FROM users WHERE id = $1::uuid`,
+            [userId]
+        );
+        if (userRow.rowCount === 0) {
+            return res.status(404).json({ error: 'User tidak ditemukan' });
+        }
+
+        const logResult = await pool.query(`
+            SELECT l.id, l.point_id, l.delta, l.reason, l.created_at,
+                   dp.title AS point_title,
+                   COUNT(*) OVER() AS total_count
+            FROM donator_points_log l
+            LEFT JOIN donation_points dp ON dp.id = l.point_id
+            WHERE l.donator_id = $1::uuid
+            ORDER BY l.created_at DESC
+            LIMIT $2 OFFSET $3
+        `, [userId, limit, offset]);
+
+        const total = logResult.rows.length > 0 ? parseInt(logResult.rows[0].total_count) : 0;
+
+        res.status(200).json({
+            pagination: { total, total_pages: Math.ceil(total / limit), current_page: page, limit },
+            data: {
+                total_points: parseInt(userRow.rows[0].points) || 0,
+                history:      logResult.rows.map(({ total_count, ...row }) => row),
+            },
+        });
+    } catch (error) {
+        console.error('Error getMyPoints:', error);
+        res.status(500).json({ error: 'Gagal mengambil data poin donatur' });
+    }
+};
+
 export const getUserActivity = async (req, res) => {
     const { userId, role } = req.user;
     const page   = Math.max(1, parseInt(req.query.page)  || 1);

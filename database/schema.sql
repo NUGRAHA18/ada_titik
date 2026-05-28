@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     role          VARCHAR(20)   NOT NULL CHECK (role IN ('donatur', 'komunitas', 'admin')),
     bio           TEXT,
     avatar_url    VARCHAR(500),
+    points        INT           NOT NULL DEFAULT 0,
     created_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS donation_points (
     title            VARCHAR(200)  NOT NULL,
     description      TEXT,
     location         GEOMETRY(Point, 4326) NOT NULL,
-    urgency          VARCHAR(20)   NOT NULL DEFAULT 'Normal'
+    urgency          VARCHAR(20)   NOT NULL DEFAULT 'Mendesak'
                          CHECK (urgency IN ('Mendesak', 'Normal', 'Rendah')),
     status           VARCHAR(20)   NOT NULL DEFAULT 'Open'
                          CHECK (status IN ('Open', 'On Progress', 'Completed')),
@@ -183,3 +184,63 @@ DROP TRIGGER IF EXISTS trg_chat_messages_touch_conv ON chat_messages;
 CREATE TRIGGER trg_chat_messages_touch_conv
     AFTER INSERT ON chat_messages
     FOR EACH ROW EXECUTE FUNCTION chat_touch_conversation();
+
+-- ============================================================
+-- DONATION PARTICIPANTS
+-- Relasi donatur-titik untuk flow Berangkat/Accept/Complete.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS donation_participants (
+    id                  SERIAL PRIMARY KEY,
+    point_id            INT  NOT NULL REFERENCES donation_points(id) ON DELETE CASCADE,
+    donator_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    state               VARCHAR(20) NOT NULL DEFAULT 'requested'
+                            CHECK (state IN ('requested','accepted','completed','cancelled')),
+    contribution_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    accepted_at         TIMESTAMP WITH TIME ZONE,
+    completed_at        TIMESTAMP WITH TIME ZONE,
+    completed_user_lat  DOUBLE PRECISION,
+    completed_user_lng  DOUBLE PRECISION,
+    created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT donation_participants_pair_unique UNIQUE (point_id, donator_id)
+);
+
+CREATE INDEX idx_donation_participants_point_state
+    ON donation_participants(point_id, state);
+CREATE INDEX idx_donation_participants_donator
+    ON donation_participants(donator_id, created_at DESC);
+
+-- ============================================================
+-- DONATOR POINTS LOG (audit poin donatur)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS donator_points_log (
+    id         SERIAL PRIMARY KEY,
+    donator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    point_id   INT  REFERENCES donation_points(id) ON DELETE SET NULL,
+    delta      INT  NOT NULL,
+    reason     VARCHAR(60) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_donator_points_log_user
+    ON donator_points_log(donator_id, created_at DESC);
+
+-- ============================================================
+-- NOTIFICATIONS (event-driven)
+-- Tipe disepakati di src/services/notificationService.js.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id         SERIAL PRIMARY KEY,
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    actor_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+    type       VARCHAR(40) NOT NULL,
+    title      VARCHAR(200) NOT NULL,
+    body       TEXT,
+    payload    JSONB NOT NULL DEFAULT '{}'::jsonb,
+    read_at    TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user_created
+    ON notifications(user_id, created_at DESC);
+CREATE INDEX idx_notifications_user_unread
+    ON notifications(user_id) WHERE read_at IS NULL;

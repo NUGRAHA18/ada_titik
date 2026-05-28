@@ -2,16 +2,19 @@ import pool from "../config/db.js";
 
 export const createDonationPoint = async (req, res) => {
     const { userId } = req.user;
-    const { title, description, longitude, latitude, urgency, category, goal_amount } = req.body;
+    const { title, description, longitude, latitude, category, goal_amount } = req.body;
 
     if (!title || !longitude || !latitude) {
         return res.status(400).json({ error: "Judul dan koordinat (longitude, latitude) wajib diisi" });
     }
 
+    // Sejak v5: urgency dipaksa 'Mendesak' saat create.
+    // FE tidak lagi menampilkan input urgency; nilai akan otomatis disesuaikan oleh
+    // sistem progress (participant accept/complete) — lihat utils/urgency.js.
     try {
         const result = await pool.query(`
             INSERT INTO donation_points (created_by, title, description, location, urgency, category, goal_amount)
-            VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, $7, $8)
+            VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), 'Mendesak', $6, $7)
             RETURNING id, title, status, urgency, category, goal_amount
         `, [
             userId,
@@ -19,7 +22,6 @@ export const createDonationPoint = async (req, res) => {
             description,
             longitude,
             latitude,
-            urgency  || 'Normal',
             category || 'Umum',
             goal_amount || 0,
         ]);

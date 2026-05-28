@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { createNotification, NOTIF_TYPE } from '../services/notificationService.js';
 
 const VALID_TABS       = ['terbaru', 'populer', 'diskusi'];
 const DISCUSSION_TYPES = ['bantuanDibutuhkan', 'pertanyaan'];
@@ -100,7 +101,7 @@ export const likePost = async (req, res) => {
         await client.query('BEGIN');
 
         const postCheck = await client.query(
-            `SELECT id FROM community_posts WHERE id = $1 FOR UPDATE`,
+            `SELECT id, author_id FROM community_posts WHERE id = $1 FOR UPDATE`,
             [postId]
         );
 
@@ -108,6 +109,8 @@ export const likePost = async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(404).json({ error: "Postingan tidak ditemukan" });
         }
+
+        const authorId = postCheck.rows[0].author_id;
 
         const existing = await client.query(
             `SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2`,
@@ -143,6 +146,17 @@ export const likePost = async (req, res) => {
         );
 
         await client.query('COMMIT');
+
+        // Notifikasi ke author hanya saat liked=true (jangan spam saat unlike).
+        if (liked) {
+            await createNotification(pool, {
+                userId:  authorId,
+                actorId: userId,
+                type:    NOTIF_TYPE.POST_LIKED,
+                title:   'Seseorang menyukai postingan Anda',
+                payload: { post_id: postId },
+            });
+        }
 
         res.status(200).json({
             message:     liked ? "Postingan disukai" : "Like dibatalkan",
@@ -209,7 +223,7 @@ export const createComment = async (req, res) => {
 
     try {
         const postCheck = await pool.query(
-            `SELECT id FROM community_posts WHERE id = $1`,
+            `SELECT id, author_id FROM community_posts WHERE id = $1`,
             [postId]
         );
 
@@ -222,6 +236,15 @@ export const createComment = async (req, res) => {
             VALUES ($1, $2, $3)
             RETURNING id, post_id, content, created_at
         `, [postId, userId, content.trim()]);
+
+        await createNotification(pool, {
+            userId:  postCheck.rows[0].author_id,
+            actorId: userId,
+            type:    NOTIF_TYPE.POST_COMMENTED,
+            title:   'Postingan Anda dikomentari',
+            body:    content.trim().slice(0, 140),
+            payload: { post_id: postId, comment_id: result.rows[0].id },
+        });
 
         res.status(201).json({ message: "Komentar berhasil ditambahkan", data: result.rows[0] });
     } catch (error) {

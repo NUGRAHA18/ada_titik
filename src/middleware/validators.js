@@ -137,3 +137,34 @@ export const listConversationsRules = [
     query('page').optional().isInt({ min: 1 }).withMessage('page harus integer positif'),
     query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit antara 1 sampai 50'),
 ];
+
+// ───── Donation Participants (v5) ─────
+export const signalBerangkatRules = [
+    body('user_lat').optional({ nullable: true }).isFloat({ min: -90, max: 90 })
+        .withMessage('user_lat tidak valid (-90 s/d 90)'),
+    body('user_lng').optional({ nullable: true }).isFloat({ min: -180, max: 180 })
+        .withMessage('user_lng tidak valid (-180 s/d 180)'),
+];
+
+export const bulkParticipantsRules = [
+    body('donator_ids').isArray({ min: 1 }).withMessage('donator_ids wajib array (min 1)'),
+    body('donator_ids.*').isUUID().withMessage('donator_ids harus berisi UUID valid'),
+];
+
+export const completeParticipantsRules = [
+    body('donator_ids').isArray({ min: 1 }).withMessage('donator_ids wajib array (min 1)'),
+    body('donator_ids.*').isUUID().withMessage('donator_ids harus berisi UUID valid'),
+    body('user_lat').isFloat({ min: -90, max: 90 })
+        .withMessage('user_lat wajib & valid (-90 s/d 90) untuk geo-fencing'),
+    body('user_lng').isFloat({ min: -180, max: 180 })
+        .withMessage('user_lng wajib & valid (-180 s/d 180) untuk geo-fencing'),
+    body('per_donator_amount').optional().isFloat({ min: 0 })
+        .withMessage('per_donator_amount harus angka >= 0'),
+];
+
+export const updateProgressRules = [
+    body('goal_amount').optional().isFloat({ min: 0 })
+        .withMessage('goal_amount harus angka >= 0'),
+    body('collected_amount').optional().isFloat({ min: 0 })
+        .withMessage('collected_amount harus angka >= 0'),
+];

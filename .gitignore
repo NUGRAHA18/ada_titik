@@ -32,4 +32,4 @@ nginx/ssl/*.key
 DEPLOY.md
 .postman/
 postman
-API_DOCUMENTATION.md
+database/

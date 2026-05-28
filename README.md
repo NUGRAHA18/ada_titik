@@ -268,6 +268,23 @@ Mewujudkan platform yang:
 
 ## 🆕 Perubahan API Terbaru
 
+### v3.2 — 2026-05-29 (jawaban requirement FE)
+
+Tiga requirement dari tim Frontend sudah dieksekusi. Detail lengkap (penanda
+"_done" untuk laporan ke FE) ada di file berikut di root repo:
+
+| Requirement FE | Penanda Selesai | Status Inti |
+|---|---|---|
+| `requirment_flow_donation.md` | [`flow_donation_done.md`](./flow_donation_done.md) | Tabel `donation_participants` + 7 endpoint baru, auto-urgency, +50 Poin Donatur per complete, geo-fencing 100 m, default urgency `Mendesak`. |
+| `requirement_notification.md` | [`notifications_done.md`](./notifications_done.md) | Tabel `notifications` (jsonb), 4 endpoint CRUD (`/api/notifications`), 7 tipe event-driven (donator_departed / participant_accepted / participant_completed / progress_updated / urgency_changed / post_liked / post_commented), realtime via Supabase publication + RLS. |
+| `requirement_chat.md` | [`chat_realtime_done.md`](./chat_realtime_done.md) | Memakai Supabase Realtime (rekomendasi bab G). Tambah `chat_conversations` ke publication agar daftar percakapan ikut realtime; backend Node tidak perlu SSE/WebSocket custom. |
+
+Migration: [`database/migration_v5.sql`](./database/migration_v5.sql) — idempotent,
+jalankan `psql -f database/migration_v5.sql`.
+
+Endpoint baru juga didokumentasikan di [`API_DOCUMENTATION.md`](./API_DOCUMENTATION.md)
+bab **9.7 – 9.13** (donation participants) dan **15.1 – 15.4** (notifikasi CRUD).
+
 ### v3.1 — 2026-05-28
 
 Penambahan **3 endpoint berbasis token** di bawah modul `Me` (`/api/me/...`) untuk mendukung **`UserActivityScreen`** di sisi Flutter:
