@@ -266,6 +266,37 @@ Mewujudkan platform yang:
 
 ---
 
+## 🆕 Perubahan API Terbaru
+
+### v3.1 — 2026-05-28
+
+Penambahan **3 endpoint berbasis token** di bawah modul `Me` (`/api/me/...`) untuk mendukung **`UserActivityScreen`** di sisi Flutter:
+
+| Method | Endpoint | Auth | Keterangan |
+|---|---|:---:|---|
+| GET | `/api/me/community/posts` | JWT | Daftar postingan komunitas yang dibuat user yang sedang login |
+| GET | `/api/me/community/likes` | JWT | Daftar post yang di-like user, beserta `post_snapshot` |
+| GET | `/api/me/community/comments` | JWT | Daftar komentar yang ditulis user, beserta `post_snapshot` |
+
+**Catatan implementasi (sesuai masukan tim FE):**
+
+- Endpoint **mengambil `userId` dari token** — FE tidak perlu kirim `userId` di query.
+- Response sudah menyertakan **`post_snapshot`** sehingga FE bisa render tanpa request tambahan per item.
+- Pagination konsisten: `?page=` (default 1), `?limit=` (default 10, maks 50).
+- `post_id` & `comment_id` bertipe **integer**, `created_at` selalu **ISO8601 (UTC)**.
+
+Pemetaan ke tab FE:
+
+| Tab di FE | Endpoint |
+|---|---|
+| "Postingan Anda" | `GET /api/me/community/posts` |
+| "Like yang Anda Berikan" | `GET /api/me/community/likes` |
+| "Komentar Anda" | `GET /api/me/community/comments` |
+
+Spesifikasi lengkap (request/response, contoh cURL): lihat `API_DOCUMENTATION.md` bab **18. Me — `/api/me`**.
+
+---
+
 ## 👨‍💻 Tim Pengembang
 
 Kelompok 4 – Informatika

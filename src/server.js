@@ -16,6 +16,7 @@ import userRoutes from './routes/userRoutes.js';
 import communityRoutes from './routes/communityRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import meRoutes from './routes/meRoutes.js';
 
 const PORT = process.env.PORT || 3000;
 const app  = express();
@@ -63,6 +64,7 @@ app.use('/api/users',         userRoutes);
 app.use('/api/community',     communityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chats',         chatRoutes);
+app.use('/api/me',            meRoutes);
 app.use('/uploads',           express.static('uploads'));
 
 app.listen(PORT, () => {
