@@ -3,7 +3,7 @@
 > **ada titik?** · Social Donation Mapping Platform
 > Backend: Node.js + Express 5 · Database: PostgreSQL + PostGIS · Storage: Supabase
 > Kelompok 4 – Informatika, UIN Sunan Kalijaga Yogyakarta
-> **Versi dokumen:** v3.2 (2026-05-29)
+> **Versi dokumen:** v3.3 (2026-05-31)
 
 ---
 
@@ -340,7 +340,93 @@ POST /api/auth/login
 
 ---
 
-### 8.3 Cek Token (Verify Me)
+### 8.3 Forgot Password (Request Token)
+
+> **Baru di v3.3.** Selalu return 200 dengan pesan generik (anti-enumeration).
+> Detail lengkap: `auth_reset_done.md`.
+
+```
+POST /api/auth/forgot-password
+```
+
+**Autentikasi:** Tidak diperlukan.
+
+**Request Body:**
+
+```json
+{ "email": "budi@example.com" }
+```
+
+| Field | Tipe | Wajib | Aturan |
+|---|---|:---:|---|
+| `email` | string | Ya | Format email valid |
+
+**Response 200 (produksi):**
+
+```json
+{
+  "success": true,
+  "message": "Jika email terdaftar, instruksi reset password telah dikirim"
+}
+```
+
+**Response 200 (dev, env `RESET_TOKEN_IN_RESPONSE=true`):**
+
+```json
+{
+  "success": true,
+  "message": "Jika email terdaftar, instruksi reset password telah dikirim",
+  "dev_reset_token": "TJaImTeYx-VRJxRZ...xhEoQQk",
+  "expires_at": "2026-05-31T09:00:00.000Z"
+}
+```
+
+Token TTL **60 menit**. Token plaintext tidak disimpan di DB (hanya sha256-nya).
+Token aktif sebelumnya milik user yang sama akan di-invalidate saat token baru
+dibuat.
+
+---
+
+### 8.4 Reset Password (Pakai Token)
+
+```
+POST /api/auth/reset-password
+```
+
+**Autentikasi:** Tidak diperlukan (token sebagai authentication).
+
+**Request Body:**
+
+```json
+{
+  "token": "TJaImTeYx-VRJxRZ...xhEoQQk",
+  "new_password": "passwordBaru123"
+}
+```
+
+| Field | Tipe | Wajib | Aturan |
+|---|---|:---:|---|
+| `token` | string | Ya | 16–200 karakter |
+| `new_password` | string | Ya | Min 8 karakter |
+
+**Response 200:**
+
+```json
+{ "success": true, "message": "Password berhasil direset" }
+```
+
+**Response Error:**
+
+| Kode | Body | Kondisi |
+|---|---|---|
+| `400` | `{ "success": false, "error": "Token tidak valid" }` | Token tidak ditemukan |
+| `400` | `{ "success": false, "error": "Token sudah digunakan" }` | Token sudah dipakai sebelumnya |
+| `400` | `{ "success": false, "error": "Token sudah kadaluarsa" }` | TTL habis |
+| `400` | `{ "error": "Validasi gagal", "details": [...] }` | `new_password` < 8 karakter, `token` kosong |
+
+---
+
+### 8.5 Cek Token (Verify Me)
 
 ```
 GET /api/auth/me
@@ -1682,6 +1768,57 @@ POST /api/community/posts/:id/comments
 
 ---
 
+### 17.6 Upload Gambar Postingan **(Baru v3.3)**
+
+Upload gambar ke bucket Supabase `community-posts` (public). Return URL publik
+yang bisa langsung dipasang ke `image_url` saat `POST /api/community/posts`.
+Detail lengkap: `community_image_done.md`.
+
+```
+POST /api/community/posts/image
+```
+
+**Autentikasi:** Bearer Token (**komunitas** saja)
+**Content-Type:** `multipart/form-data`
+
+**Form Fields:**
+
+| Field | Tipe | Wajib | Keterangan |
+|---|---|:---:|---|
+| `image` | file | Ya | `image/*`, maks 5 MB |
+
+**Contoh cURL:**
+
+```bash
+curl -X POST http://localhost:3000/api/community/posts/image \
+  -H "Authorization: Bearer eyJ0eXAi..." \
+  -F "image=@/path/to/foto.jpg"
+```
+
+**Response 201 Created:**
+
+```json
+{
+  "message": "Gambar berhasil diunggah",
+  "image_url": "https://<project>.supabase.co/storage/v1/object/public/community-posts/<user_id>/<ts>-<rand>.jpg"
+}
+```
+
+**Response Error:**
+
+| Kode | Kondisi |
+|---|---|
+| `400` | Field `image` tidak diisi atau bukan file gambar |
+| `403` | Role bukan komunitas/admin |
+| `500` | Bucket `community-posts` belum dibuat di Supabase, atau gagal upload |
+
+> **Alur FE yang disarankan:** (1) panggil endpoint ini untuk dapat `image_url`,
+> (2) panggil `POST /api/community/posts` dengan body JSON yang mencantumkan
+> `image_url` tersebut. Endpoint create post tetap berupa JSON murni — lebih
+> mudah ditest dan FE bisa preview gambar dulu sebelum publish.
+
+---
+
 ## 18. Me — `/api/me`
 
 > **Baru di v3.1 (2026-05-28).** Endpoint berbasis token untuk mengambil aktivitas user yang sedang login (posts, likes, comments). Dirancang agar `UserActivityScreen` di FE bisa menampilkan tiga tab tanpa kirim `userId` manual & tanpa rangkaian request tambahan per item.
@@ -2057,6 +2194,38 @@ GET /health
 
 ## 22. Changelog
 
+### v3.3 — 2026-05-31
+
+Penyesuaian lanjutan dari masukan tim FE: upload gambar untuk community feed,
+forgot/reset password end-to-end, dan menambahkan realtime untuk
+`community_posts` & `donation_points`. Migration: `database/migration_v6.sql`.
+Penanda implementasi: `community_image_done.md`, `auth_reset_done.md`
+(plus catatan realtime di file masing-masing).
+
+#### DB Schema
+
+- Tabel baru: `password_reset_tokens`.
+- Realtime publication ditambah: `community_posts`, `donation_points`.
+- RLS baru: `community_posts_public_read` (USING true), `donation_points_public_read` (USING `deleted_at IS NULL`).
+
+#### Endpoint Baru
+
+| Endpoint | Keterangan |
+|---|---|
+| `POST /api/auth/forgot-password` | Request token reset (anti-enumeration). |
+| `POST /api/auth/reset-password` | Reset password dengan token (60 menit TTL). |
+| `POST /api/community/posts/image` | Upload gambar ke bucket `community-posts`, return `image_url`. |
+
+#### Env Tambahan
+
+- `RESET_TOKEN_IN_RESPONSE=true` — opsional, untuk dev/QA: token reset ikut
+  di response `/forgot-password`. **Jangan aktifkan di production.**
+
+#### Storage Setup
+
+- Bucket Supabase baru: `community-posts` (public). Lihat
+  `community_image_done.md` bagian C.
+
 ### v3.2 — 2026-05-29
 
 Penyesuaian besar berdasarkan masukan tim FE di `requirment_flow_donation.md`,
@@ -2207,7 +2376,10 @@ Migration: `database/migration_v3.sql`.
 | 43 | PATCH | `/api/notifications/read-all` | JWT | Semua |
 | 44 | DELETE | `/api/notifications/:id` | JWT | Semua |
 | 45 | GET | `/api/users/points` | JWT | Semua (poin donatur) |
+| 46 | POST | `/api/auth/forgot-password` | — | Publik |
+| 47 | POST | `/api/auth/reset-password` | — | Publik (token sebagai auth) |
+| 48 | POST | `/api/community/posts/image` | JWT | Komunitas |
 
 ---
 
-*Dokumentasi ini sinkron dengan source code per 2026-05-29 (v3.2 — flow donasi participants, notifikasi event-driven, chat realtime via Supabase).*
+*Dokumentasi ini sinkron dengan source code per 2026-05-31 (v3.3 — upload gambar community feed, forgot/reset password, realtime `community_posts` & `donation_points`).*

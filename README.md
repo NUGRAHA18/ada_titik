@@ -268,21 +268,35 @@ Mewujudkan platform yang:
 
 ## 🆕 Perubahan API Terbaru
 
+### v3.3 — 2026-05-31 (upload gambar, reset password, realtime feed/donasi)
+
+Lanjutan dari tiga requirement FE — fokus pada tiga gap yang dilaporkan:
+
+| Kebutuhan FE | Penanda Selesai | Status Inti |
+|---|---|---|
+| Upload gambar untuk card community feed | [`community_image_done.md`](./documentations/community_image_done.md) | Endpoint `POST /api/community/posts/image` (multipart) → return `image_url`. Bucket Supabase `community-posts` (public). `GET /posts` sudah return `image_url` sejak v3. |
+| Forgot / reset password end-to-end | [`auth_reset_done.md`](./documentations/auth_reset_done.md) | Tabel `password_reset_tokens` (sha256). Endpoint `POST /api/auth/forgot-password` (anti-enumeration) & `POST /api/auth/reset-password` (60 menit TTL). |
+| Realtime `community_posts` & `donation_points` | Catatan di kedua file di atas | Tabel ditambah ke `supabase_realtime` publication + RLS SELECT publik. FE bisa subscribe `onPostgresChanges` untuk auto-update feed & maps. |
+
+Migration: [`database/migration_v6.sql`](./database/migration_v6.sql) — idempotent.
+Endpoint baru juga di [`API_DOCUMENTATION.md`](./documentations/API_DOCUMENTATION.md)
+bab **8.3 – 8.4** (auth reset) dan **17.6** (upload gambar post).
+
 ### v3.2 — 2026-05-29 (jawaban requirement FE)
 
 Tiga requirement dari tim Frontend sudah dieksekusi. Detail lengkap (penanda
-"_done" untuk laporan ke FE) ada di file berikut di root repo:
+"_done" untuk laporan ke FE) ada di folder `documentations/`:
 
 | Requirement FE | Penanda Selesai | Status Inti |
 |---|---|---|
-| `requirment_flow_donation.md` | [`flow_donation_done.md`](./flow_donation_done.md) | Tabel `donation_participants` + 7 endpoint baru, auto-urgency, +50 Poin Donatur per complete, geo-fencing 100 m, default urgency `Mendesak`. |
-| `requirement_notification.md` | [`notifications_done.md`](./notifications_done.md) | Tabel `notifications` (jsonb), 4 endpoint CRUD (`/api/notifications`), 7 tipe event-driven (donator_departed / participant_accepted / participant_completed / progress_updated / urgency_changed / post_liked / post_commented), realtime via Supabase publication + RLS. |
-| `requirement_chat.md` | [`chat_realtime_done.md`](./chat_realtime_done.md) | Memakai Supabase Realtime (rekomendasi bab G). Tambah `chat_conversations` ke publication agar daftar percakapan ikut realtime; backend Node tidak perlu SSE/WebSocket custom. |
+| `requirment_flow_donation.md` | [`flow_donation_done.md`](./documentations/flow_donation_done.md) | Tabel `donation_participants` + 7 endpoint baru, auto-urgency, +50 Poin Donatur per complete, geo-fencing 100 m, default urgency `Mendesak`. |
+| `requirement_notification.md` | [`notifications_done.md`](./documentations/notifications_done.md) | Tabel `notifications` (jsonb), 4 endpoint CRUD (`/api/notifications`), 7 tipe event-driven (donator_departed / participant_accepted / participant_completed / progress_updated / urgency_changed / post_liked / post_commented), realtime via Supabase publication + RLS. |
+| `requirement_chat.md` | [`chat_realtime_done.md`](./documentations/chat_realtime_done.md) | Memakai Supabase Realtime (rekomendasi bab G). Tambah `chat_conversations` ke publication agar daftar percakapan ikut realtime; backend Node tidak perlu SSE/WebSocket custom. |
 
 Migration: [`database/migration_v5.sql`](./database/migration_v5.sql) — idempotent,
 jalankan `psql -f database/migration_v5.sql`.
 
-Endpoint baru juga didokumentasikan di [`API_DOCUMENTATION.md`](./API_DOCUMENTATION.md)
+Endpoint baru juga didokumentasikan di [`API_DOCUMENTATION.md`](./documentations/API_DOCUMENTATION.md)
 bab **9.7 – 9.13** (donation participants) dan **15.1 – 15.4** (notifikasi CRUD).
 
 ### v3.1 — 2026-05-28

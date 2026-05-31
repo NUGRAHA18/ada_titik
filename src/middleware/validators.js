@@ -28,6 +28,16 @@ export const loginRules = [
     body('password').notEmpty().withMessage('Password wajib diisi'),
 ];
 
+export const forgotPasswordRules = [
+    body('email').isEmail().withMessage('Format email tidak valid').normalizeEmail(),
+];
+
+export const resetPasswordRules = [
+    body('token').isString().trim().notEmpty().withMessage('Token wajib diisi')
+        .isLength({ min: 16, max: 200 }).withMessage('Token tidak valid'),
+    body('new_password').isString().isLength({ min: 8 }).withMessage('new_password minimal 8 karakter'),
+];
+
 export const createDonationRules = [
     body('title').trim().notEmpty().withMessage('Judul wajib diisi')
         .isLength({ max: 200 }).withMessage('Judul maksimal 200 karakter'),

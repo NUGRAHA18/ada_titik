@@ -1,5 +1,9 @@
+import path from 'path';
 import pool from '../config/db.js';
+import supabase from '../config/supabase.js';
 import { createNotification, NOTIF_TYPE } from '../services/notificationService.js';
+
+const POST_IMAGE_BUCKET = 'community-posts';
 
 const VALID_TABS       = ['terbaru', 'populer', 'diskusi'];
 const DISCUSSION_TYPES = ['bantuanDibutuhkan', 'pertanyaan'];
@@ -61,6 +65,53 @@ export const getPosts = async (req, res) => {
     } catch (error) {
         console.error("Error Get Community Posts:", error);
         res.status(500).json({ error: "Gagal mengambil daftar postingan" });
+    }
+};
+
+/**
+ * POST /api/community/posts/image (multipart, field name: "image")
+ * Upload gambar ke bucket Supabase `community-posts`, return image_url publik.
+ * FE lalu mengirim image_url tersebut ke POST /api/community/posts.
+ *
+ * Dipisah dari createPost supaya FE bisa preview gambar dulu sebelum publish,
+ * dan supaya endpoint create post tetap JSON murni (lebih mudah ditest).
+ */
+export const uploadPostImage = async (req, res) => {
+    const { userId } = req.user;
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'File gambar wajib diunggah (field "image")' });
+    }
+
+    let uploadedPath = null;
+    try {
+        const ext      = path.extname(req.file.originalname).toLowerCase();
+        const filename = `${userId}/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from(POST_IMAGE_BUCKET)
+            .upload(filename, req.file.buffer, {
+                contentType: req.file.mimetype,
+                upsert: false,
+            });
+
+        if (uploadError) throw uploadError;
+        uploadedPath = filename;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from(POST_IMAGE_BUCKET)
+            .getPublicUrl(filename);
+
+        res.status(201).json({
+            message:   'Gambar berhasil diunggah',
+            image_url: publicUrl,
+        });
+    } catch (error) {
+        if (uploadedPath) {
+            await supabase.storage.from(POST_IMAGE_BUCKET).remove([uploadedPath]).catch(() => {});
+        }
+        console.error('Error uploadPostImage:', error);
+        res.status(500).json({ error: 'Gagal mengunggah gambar postingan' });
     }
 };
 

@@ -32,4 +32,5 @@ nginx/ssl/*.key
 DEPLOY.md
 .postman/
 postman
-database/
+
+/dataset/

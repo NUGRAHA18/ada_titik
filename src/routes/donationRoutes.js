@@ -45,7 +45,7 @@ router.patch('/:id', verifyToken, checkRole(['komunitas']), updateDonationRules,
 router.patch('/:id/status', verifyToken, checkRole(['donatur', 'komunitas']), updateStatusRules, validate, updateDonationStatus);
 
 // Flow Donasi: Berangkat / Accept / Complete 
-router.post('/:pointId/participants',verifyToken,checkRole(['donatur']),               signalBerangkatRules,      validate, signalBerangkat);
+router.post('/:pointId/participants',           verifyToken, checkRole(['donatur']),               signalBerangkatRules,      validate, signalBerangkat);
 router.delete('/:pointId/participants/me',      verifyToken, checkRole(['donatur']),                                                    cancelBerangkat);
 router.get('/:pointId/participants/me',         verifyToken,                                                                            getMyParticipation);
 router.get('/:pointId/participants',            verifyToken, checkRole(['komunitas']),                                                  listParticipants);
