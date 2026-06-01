@@ -13,6 +13,7 @@ export const getProfile = async (req, res) => {
         if (role === 'komunitas' || role === 'admin') {
             result = await pool.query(`
                 SELECT u.id, u.name, u.email, u.role, u.bio, u.avatar_url, u.created_at,
+                       u.points AS community_points,
                        COUNT(DISTINCT dp.id)
                            FILTER (WHERE dp.deleted_at IS NULL) AS donation_count,
                        COUNT(DISTINCT dp.id)
@@ -25,13 +26,26 @@ export const getProfile = async (req, res) => {
                 GROUP BY u.id
             `, [userId]);
         } else {
+            // total_donation dihitung via subquery atas DISTINCT point supaya
+            // duplikasi baris JOIN (ratings) tidak menggandakan / mengkolaps nilai.
+            // SUM(DISTINCT goal_amount) lama SALAH: dua titik dengan goal sama
+            // ter-collapse jadi satu.
             result = await pool.query(`
                 SELECT u.id, u.name, u.email, u.role, u.bio, u.avatar_url, u.created_at,
+                       u.points AS community_points,
                        COUNT(DISTINCT r.id) AS donation_count,
                        COUNT(DISTINCT dp.id)
                            FILTER (WHERE dp.status = 'Completed' AND dp.deleted_at IS NULL) AS points_helped,
-                       COALESCE(SUM(DISTINCT dp.goal_amount)
-                           FILTER (WHERE dp.status = 'Completed' AND dp.deleted_at IS NULL), 0) AS total_donation
+                       COALESCE((
+                           SELECT SUM(x.goal_amount) FROM (
+                               SELECT DISTINCT dp2.id, dp2.goal_amount
+                               FROM donation_points dp2
+                               JOIN ratings r2 ON r2.point_id = dp2.id
+                               WHERE r2.given_by = u.id
+                                 AND dp2.status = 'Completed'
+                                 AND dp2.deleted_at IS NULL
+                           ) x
+                       ), 0) AS total_donation
                 FROM users u
                 LEFT JOIN ratings r          ON r.given_by = u.id
                 LEFT JOIN donation_points dp ON dp.id = r.point_id
@@ -48,9 +62,10 @@ export const getProfile = async (req, res) => {
         res.status(200).json({
             data: {
                 ...row,
-                donation_count: parseInt(row.donation_count) || 0,
-                points_helped:  parseInt(row.points_helped)  || 0,
-                total_donation: parseFloat(row.total_donation) || 0,
+                donation_count:   parseInt(row.donation_count) || 0,
+                points_helped:    parseInt(row.points_helped)  || 0,
+                total_donation:   parseFloat(row.total_donation) || 0,
+                community_points: parseInt(row.community_points) || 0,
             },
         });
     } catch (error) {
@@ -205,30 +220,63 @@ export const getUserActivity = async (req, res) => {
                 created_at: r.created_at,
             }));
         } else {
+            // Aktivitas donatur = rating yang diberikan + partisipasi donasi
+            // (berangkat / diterima / selesai). Sebelumnya HANYA rating yang
+            // dihitung, sehingga donatur yang sering berdonasi tapi jarang
+            // memberi rating tampak nyaris tanpa aktivitas (count salah).
             const result = await pool.query(`
-                SELECT r.id, r.score, r.review, r.created_at,
-                       dp.id AS point_id, dp.title AS point_title, dp.status AS point_status,
-                       dp.category AS point_category,
-                       COUNT(*) OVER() AS total_count
-                FROM ratings r
-                JOIN donation_points dp ON r.point_id = dp.id
-                WHERE r.given_by = $1
-                ORDER BY r.created_at DESC
+                SELECT a.*, COUNT(*) OVER() AS total_count FROM (
+                    SELECT 'rating_' || r.id::text       AS id,
+                           dp.title                       AS title,
+                           'Memberi nilai ' || r.score || '/5' AS subtitle,
+                           'rating_given'                 AS type,
+                           r.score                        AS score,
+                           r.review                       AS review,
+                           dp.id                          AS point_id,
+                           dp.status                      AS point_status,
+                           dp.category                    AS point_category,
+                           r.created_at                   AS created_at
+                    FROM ratings r
+                    JOIN donation_points dp ON r.point_id = dp.id
+                    WHERE r.given_by = $1
+
+                    UNION ALL
+
+                    SELECT 'part_' || pt.id::text         AS id,
+                           dp.title                       AS title,
+                           CASE pt.state
+                               WHEN 'requested' THEN 'Menunggu konfirmasi keberangkatan'
+                               WHEN 'accepted'  THEN 'Keberangkatan diterima komunitas'
+                               WHEN 'completed' THEN 'Donasi selesai • +50 poin'
+                               ELSE 'Partisipasi donasi'
+                           END                            AS subtitle,
+                           'participation_' || pt.state   AS type,
+                           NULL::int                      AS score,
+                           NULL::text                     AS review,
+                           dp.id                          AS point_id,
+                           dp.status                      AS point_status,
+                           dp.category                    AS point_category,
+                           pt.created_at                  AS created_at
+                    FROM donation_participants pt
+                    JOIN donation_points dp ON pt.point_id = dp.id
+                    WHERE pt.donator_id = $1 AND pt.state <> 'cancelled'
+                ) a
+                ORDER BY a.created_at DESC
                 LIMIT $2 OFFSET $3
             `, [userId, limit, offset]);
 
             total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
             rows = result.rows.map(r => ({
-                id:         r.id,
-                title:      r.point_title,
-                subtitle:   `Memberi nilai ${r.score}/5`,
-                type:       'rating_given',
-                score:      r.score,
-                review:     r.review,
-                point_id:   r.point_id,
+                id:             r.id,
+                title:          r.title,
+                subtitle:       r.subtitle,
+                type:           r.type,
+                score:          r.score,
+                review:         r.review,
+                point_id:       r.point_id,
                 point_status:   r.point_status,
                 point_category: r.point_category,
-                created_at: r.created_at,
+                created_at:     r.created_at,
             }));
         }
 

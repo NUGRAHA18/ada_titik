@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { createNotification, createNotificationsBulk, NOTIF_TYPE } from '../services/notificationService.js';
 
 export const getAllReports = async (req, res) => {
     const page   = Math.max(1, parseInt(req.query.page)  || 1);
@@ -19,14 +20,23 @@ export const getAllReports = async (req, res) => {
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
         values.push(limit, offset);
 
+        // LEFT JOIN supaya laporan TITIK maupun POSTINGAN komunitas (v7) ikut
+        // tampil. target_type membedakan keduanya untuk UI admin.
         const result = await pool.query(`
             SELECT r.id AS report_id, r.reason, r.status AS report_status, r.created_at,
-                   u.name AS reporter_name,
-                   p.title AS point_title, p.id AS point_id,
+                   r.reporter_id, u.name AS reporter_name, u.email AS reporter_email,
+                   r.point_id, r.post_id,
+                   CASE WHEN r.post_id IS NOT NULL THEN 'post' ELSE 'point' END AS target_type,
+                   COALESCE(p.title, 'Postingan #' || r.post_id) AS point_title,
+                   COALESCE(p.created_by, post.author_id) AS owner_id,
+                   COALESCE(owner.name, post_owner.name)   AS owner_name,
                    COUNT(*) OVER() AS total_count
             FROM reports r
-            JOIN users u           ON r.reporter_id = u.id
-            JOIN donation_points p ON r.point_id = p.id
+            JOIN users u                  ON r.reporter_id = u.id
+            LEFT JOIN donation_points p   ON r.point_id = p.id
+            LEFT JOIN community_posts post ON r.post_id = post.id
+            LEFT JOIN users owner          ON p.created_by = owner.id
+            LEFT JOIN users post_owner     ON post.author_id = post_owner.id
             ${whereClause}
             ORDER BY r.created_at DESC
             LIMIT $${idx++} OFFSET $${idx}
@@ -71,15 +81,31 @@ export const updateReportStatus = async (req, res) => {
 
     try {
         const result = await pool.query(
-            `UPDATE reports SET status = $1 WHERE id = $2 RETURNING id, status`,
+            `UPDATE reports SET status = $1 WHERE id = $2
+             RETURNING id, status, reporter_id, point_id`,
             [status, id]
         );
 
         if (result.rowCount === 0) return res.status(404).json({ error: "Laporan tidak ditemukan" });
 
+        const report = result.rows[0];
+
+        // Tutup loop ke pelapor: beri tahu laporannya sudah ditindaklanjuti admin.
+        const verdict = status === 'resolved'
+            ? 'Laporan Anda terbukti dan telah ditindaklanjuti.'
+            : 'Laporan Anda telah ditinjau namun tidak ditemukan pelanggaran.';
+        await createNotification(pool, {
+            userId:  report.reporter_id,
+            actorId: req.user.userId,
+            type:    NOTIF_TYPE.REPORT_REVIEWED,
+            title:   'Laporan Anda telah ditinjau',
+            body:    verdict,
+            payload: { report_id: report.id, status: report.status, point_id: report.point_id },
+        });
+
         res.status(200).json({
             message: `Laporan berhasil diverifikasi dengan status '${status}'`,
-            data: result.rows[0],
+            data: { id: report.id, status: report.status },
         });
     } catch (error) {
         console.error("Error Update Report Status:", error);
@@ -93,7 +119,9 @@ export const deleteInvalidPoint = async (req, res) => {
 
     try {
         const result = await pool.query(
-            `UPDATE donation_points SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING title`,
+            `UPDATE donation_points SET deleted_at = NOW()
+             WHERE id = $1 AND deleted_at IS NULL
+             RETURNING title, created_by`,
             [id]
         );
 
@@ -101,7 +129,40 @@ export const deleteInvalidPoint = async (req, res) => {
             return res.status(404).json({ error: "Titik tidak ditemukan atau sudah dihapus" });
         }
 
-        res.status(200).json({ message: `Titik '${result.rows[0].title}' berhasil disembunyikan dari tampilan publik.` });
+        const { title, created_by } = result.rows[0];
+
+        // Beri tahu pemilik titik (komunitas) bahwa titiknya disembunyikan admin.
+        await createNotification(pool, {
+            userId:  created_by,
+            actorId: req.user.userId,
+            type:    NOTIF_TYPE.POINT_REMOVED,
+            title:   'Titik Anda disembunyikan',
+            body:    `Titik "${title}" disembunyikan oleh admin karena melanggar ketentuan komunitas.`,
+            payload: { point_id: Number(id) },
+        });
+
+        // Tutup loop ke para pelapor titik ini: laporan mereka ditindaklanjuti.
+        const reporters = await pool.query(
+            `SELECT DISTINCT reporter_id FROM reports WHERE point_id = $1`,
+            [id]
+        );
+        if (reporters.rowCount > 0) {
+            await createNotificationsBulk(pool, reporters.rows.map(r => ({
+                userId:  r.reporter_id,
+                actorId: req.user.userId,
+                type:    NOTIF_TYPE.REPORT_REVIEWED,
+                title:   'Laporan Anda ditindaklanjuti',
+                body:    `Titik "${title}" yang Anda laporkan telah disembunyikan.`,
+                payload: { point_id: Number(id), status: 'resolved' },
+            })));
+            // Sekaligus tandai laporan titik ini resolved.
+            await pool.query(
+                `UPDATE reports SET status = 'resolved' WHERE point_id = $1 AND status = 'pending'`,
+                [id]
+            );
+        }
+
+        res.status(200).json({ message: `Titik '${title}' berhasil disembunyikan dari tampilan publik.` });
     } catch (error) {
         console.error("Error Delete Point:", error);
         res.status(500).json({ error: "Gagal menghapus data" });

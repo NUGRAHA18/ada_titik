@@ -154,11 +154,16 @@ export const getDonationPointById = async (req, res) => {
 };
 
 export const getNearbyDonations = async (req, res) => {
-    const { lat, lng, radius } = req.query;
+    const { lat, lng, radius, status } = req.query;
 
     if (!lat || !lng || !radius) {
         return res.status(400).json({ error: "Parameter lat, lng, dan radius (dalam meter) wajib diisi" });
     }
+
+    // Honor parameter status dari klien (sebelumnya diabaikan → titik
+    // 'On Progress' tidak pernah muncul di peta/nearby). Default 'Open'.
+    const allowedStatuses = ['Open', 'On Progress', 'Completed'];
+    const statusFilter = allowedStatuses.includes(status) ? status : 'Open';
 
     try {
         const result = await pool.query(`
@@ -168,10 +173,10 @@ export const getNearbyDonations = async (req, res) => {
                    ST_Y(location::geometry) AS latitude,
                    ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS distance_meters
             FROM donation_points
-            WHERE status = 'Open' AND deleted_at IS NULL
+            WHERE status = $4 AND deleted_at IS NULL
               AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($1, $2), 4326), $3)
             ORDER BY distance_meters ASC
-        `, [lng, lat, radius]);
+        `, [lng, lat, radius, statusFilter]);
 
         res.status(200).json({
             message: `Menampilkan titik bantuan dalam radius ${radius} meter`,
@@ -210,6 +215,12 @@ export const updateDonationStatus = async (req, res) => {
         if (status === 'On Progress') {
             if (point.status !== 'Open') {
                 return res.status(400).json({ error: "Hanya bantuan 'Open' yang bisa diproses" });
+            }
+            // Hanya owner (komunitas pengelola) yang boleh memproses titiknya.
+            // Sebelumnya tanpa cek ini, donatur mana pun bisa mengubah status
+            // titik milik orang lain.
+            if (point.created_by !== userId) {
+                return res.status(403).json({ error: "Hanya Komunitas pengelola yang bisa memproses titik ini" });
             }
         } else if (status === 'Completed') {
             if (point.status !== 'On Progress') {

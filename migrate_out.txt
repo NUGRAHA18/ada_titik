@@ -1,0 +1,10 @@
+◇ injected env (7) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+✅ Terhubung ke database Titik Baik!
+⏭  schema.sql — sudah diterapkan, dilewati
+⏭  migration_v2.sql — sudah diterapkan, dilewati
+⏭  migration_v3.sql — sudah diterapkan, dilewati
+⏭  migration_v4.sql — sudah diterapkan, dilewati
+⏭  migration_v5.sql — sudah diterapkan, dilewati
+⏭  migration_v6.sql — sudah diterapkan, dilewati
+⏭  migration_v7.sql — sudah diterapkan, dilewati

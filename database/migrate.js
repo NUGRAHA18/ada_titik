@@ -10,6 +10,15 @@ const MIGRATIONS = [
     'schema.sql',
     'migration_v2.sql',
     'migration_v3.sql',
+    // BUG FIX: v4–v6 sebelumnya TIDAK terdaftar di runner, sehingga setup
+    // realtime publication, donation_participants, notifications, dan RLS
+    // tidak pernah diterapkan via `npm run migrate` (penyebab realtime tak
+    // jalan di DB yang baru di-setup). Semuanya idempotent (pakai
+    // IF [NOT] EXISTS / DROP POLICY IF EXISTS) jadi aman di-rerun.
+    'migration_v4.sql',
+    'migration_v5.sql',
+    'migration_v6.sql',
+    'migration_v7.sql',
 ];
 
 async function migrate() {

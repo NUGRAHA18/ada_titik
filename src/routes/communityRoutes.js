@@ -6,6 +6,7 @@ import {
     getComments,
     createComment,
     uploadPostImage,
+    reportPost,
 } from '../controllers/communityController.js';
 import { verifyToken, verifyTokenOptional } from '../middleware/authMiddleware.js';
 import { checkRole } from '../middleware/roleMiddleware.js';
@@ -25,5 +26,6 @@ router.post('/posts/image', verifyToken, checkRole(['komunitas']), upload.single
 router.post('/posts/:id/like', verifyToken, likePost);
 router.get('/posts/:id/comments', getComments);
 router.post('/posts/:id/comments', verifyToken, createCommentRules, validate, createComment);
+router.post('/posts/:id/report', verifyToken, reportPost);
 
 export default router;

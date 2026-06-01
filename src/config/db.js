@@ -3,8 +3,25 @@ import "dotenv/config";
 
 const { Pool } = pg;
 
+// pg/pg-connection-string versi baru memperlakukan sslmode=require sebagai
+// verify-full, yang MENOLAK rantai sertifikat self-signed Supabase
+// (SELF_SIGNED_CERT_IN_CHAIN). Kita kelola SSL lewat opsi `ssl` di bawah
+// (rejectUnauthorized:false), jadi buang sslmode/ssl dari connection string
+// agar tidak menimpa konfigurasi tersebut.
+function sanitizeConnectionString(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("sslmode");
+    u.searchParams.delete("ssl");
+    return u.toString();
+  } catch {
+    return url.replace(/([?&])sslmode=[^&]*/gi, "$1").replace(/[?&]$/, "");
+  }
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: sanitizeConnectionString(process.env.DATABASE_URL),
   ssl: {
     rejectUnauthorized: false,
   },

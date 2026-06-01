@@ -1,7 +1,7 @@
 import path from 'path';
 import pool from '../config/db.js';
 import supabase from '../config/supabase.js';
-import { createNotification, NOTIF_TYPE } from '../services/notificationService.js';
+import { createNotification, createNotificationsBulk, NOTIF_TYPE } from '../services/notificationService.js';
 
 const POST_IMAGE_BUCKET = 'community-posts';
 
@@ -301,5 +301,63 @@ export const createComment = async (req, res) => {
     } catch (error) {
         console.error("Error Create Comment:", error);
         res.status(500).json({ error: "Gagal menambahkan komentar" });
+    }
+};
+
+// ─── Report a community post (v7) ─────────────────────────────────────────
+// Sebelumnya FE mengirim post_id ke /api/reports (FK ke donation_points) →
+// FK violation / salah lapor. Sekarang post dilaporkan lewat reports.post_id.
+export const reportPost = async (req, res) => {
+    const postId = parseInt(req.params.id, 10);
+    const { reason } = req.body;
+    const { userId } = req.user;
+
+    if (!Number.isInteger(postId) || postId < 1) {
+        return res.status(400).json({ error: 'ID postingan tidak valid' });
+    }
+    if (!reason || !reason.trim()) {
+        return res.status(400).json({ error: 'Alasan laporan wajib diisi' });
+    }
+
+    try {
+        const post = await pool.query(
+            `SELECT id, author_id FROM community_posts WHERE id = $1`,
+            [postId]
+        );
+        if (post.rowCount === 0) {
+            return res.status(404).json({ error: 'Postingan tidak ditemukan' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO reports (reporter_id, post_id, reason)
+             VALUES ($1, $2, $3)
+             RETURNING id, status, created_at`,
+            [userId, postId, reason.trim().slice(0, 1000)]
+        );
+
+        // Integrasi admin: beri tahu semua admin ada laporan postingan baru.
+        try {
+            const admins = await pool.query(`SELECT id FROM users WHERE role = '"admin"'`);
+            if (admins.rowCount > 0) {
+                await createNotificationsBulk(pool, admins.rows.map(a => ({
+                    userId:  a.id,
+                    actorId: userId,
+                    type:    NOTIF_TYPE.REPORT_CREATED,
+                    title:   'Laporan postingan masuk',
+                    body:    reason.trim().slice(0, 80),
+                    payload: { report_id: result.rows[0].id, post_id: postId },
+                })));
+            }
+        } catch (e) {
+            console.error('Gagal notifikasi admin (post report):', e.message);
+        }
+
+        res.status(201).json({
+            message: 'Laporan postingan berhasil dikirim dan akan ditinjau Admin',
+            data: result.rows[0],
+        });
+    } catch (error) {
+        console.error('Error Report Post:', error);
+        res.status(500).json({ error: 'Gagal mengirim laporan postingan' });
     }
 };

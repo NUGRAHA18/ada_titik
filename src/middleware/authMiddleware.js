@@ -9,14 +9,21 @@ export const verifyToken = (req, res, next) => {
       .json({ error: "Akses ditolak. Token tidak ditemukan" });
   }
 
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme !== "Bearer" || !token) {
+    return res
+      .status(401)
+      .json({ error: "Format token tidak valid. Gunakan 'Bearer <token>'." });
+  }
+
   try {
-    const token = authHeader.split(" ")[1];
     const verified = jwt.verify(token, process.env.JWT_SECRET);
     req.user = verified;
 
     next();
   } catch (error) {
-    res.status(400).json({ error: "Token tidak valid atau sudah kadaluarsa" });
+    // 401 (bukan 400) supaya klien memicu re-login otomatis.
+    res.status(401).json({ error: "Token tidak valid atau sudah kadaluarsa" });
   }
 };
 

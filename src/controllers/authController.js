@@ -60,7 +60,10 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const query = `SELECT id, name, email, password_hash, role FROM users WHERE email = $1`;
+        // LOWER(...) supaya konsisten dengan registrasi yang menormalisasi email
+        // ke huruf kecil (registerRules.normalizeEmail). Tanpa ini, user yang
+        // daftar "User@x.com" lalu login "user@x.com" akan gagal.
+        const query = `SELECT id, name, email, password_hash, role FROM users WHERE LOWER(email) = LOWER($1)`;
         const result = await pool.query(query, [email]);
 
         if (result.rowCount === 0) {
@@ -152,8 +155,11 @@ export const requestPasswordReset = async (req, res) => {
         );
 
         // TODO: integrasi dengan email service (SendGrid / Mailgun / SES).
-        // Untuk sementara, log token di server agar tim dev bisa pakai.
-        console.log(`[password-reset] user=${userId} token=${tokenPlain} expires=${expiresAt.toISOString()}`);
+        // JANGAN log token plaintext di production (bocor lewat agregasi log).
+        // Hanya tampilkan di development untuk keperluan testing.
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[password-reset] user=${userId} token=${tokenPlain} expires=${expiresAt.toISOString()}`);
+        }
 
         const payload = { ...GENERIC_RESET_RESPONSE };
         if (process.env.RESET_TOKEN_IN_RESPONSE === 'true') {

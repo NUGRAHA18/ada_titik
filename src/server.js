@@ -17,6 +17,7 @@ import communityRoutes from './routes/communityRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import meRoutes from './routes/meRoutes.js';
+import { errorHandler, healthCheck } from './middleware/errorHandler.js';
 
 const PORT = process.env.PORT || 3000;
 const app  = express();
@@ -53,6 +54,8 @@ app.use(express.json());
 app.use(limiter);
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+app.get('/health', healthCheck);
+
 app.use("/api/auth",          authRoutes);
 app.use("/api/donations",     donationRoutes);
 app.use('/api/documentation', documentationRoutes);
@@ -66,6 +69,11 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/chats',         chatRoutes);
 app.use('/api/me',            meRoutes);
 app.use('/uploads',           express.static('uploads'));
+
+// Global error handler — WAJIB terakhir, setelah semua route.
+// Tanpa ini, error (mis. multer LIMIT_FILE_SIZE) jatuh ke default handler
+// Express yang membocorkan stack trace sebagai HTML di non-production.
+app.use(errorHandler);
 
 app.listen(PORT, () => {
     const env = process.env.NODE_ENV || 'development';

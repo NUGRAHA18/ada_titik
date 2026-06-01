@@ -12,6 +12,10 @@ export const NOTIF_TYPE = Object.freeze({
     // komunitas / sosial
     POST_LIKED:              'post_liked',               // → author post
     POST_COMMENTED:          'post_commented',           // → author post
+    // moderasi / admin
+    REPORT_CREATED:          'report_created',           // → semua admin (laporan masuk)
+    REPORT_REVIEWED:         'report_reviewed',          // → pelapor (laporan ditindaklanjuti)
+    POINT_REMOVED:           'point_removed',            // → pemilik titik (titik disembunyikan admin)
 });
 
 // Jalankan via client (di tengah transaction) atau pool langsung.
